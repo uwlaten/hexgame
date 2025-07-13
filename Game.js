@@ -2,6 +2,8 @@
  * @fileoverview Defines the main Game class, which orchestrates game logic.
  */
 
+import { Building } from './Building.js';
+import PlacementRules from './PlacementRules.js';
 /**
  * Manages the overall game state, player actions, and game rules.
  * It listens for events and updates the game world accordingly.
@@ -30,10 +32,20 @@ export default class Game {
    * @private
    */
   _handleHexClick(tile) {
-    // Rule: You can only build on empty land tiles (not ocean or mountain).
-    if (!tile.contentType && tile.biomeType !== 'ocean' && tile.biomeType !== 'mountain') {
-      tile.contentType = this.player.currentTileInHand;
-      console.log(`Placed '${this.player.currentTileInHand}' on tile (${tile.x}, ${tile.y})`);
+    const buildingTypeToPlace = this.player.currentTileInHand;
+
+    // Delegate rule checking to the expert module.
+    if (PlacementRules.canPlaceBuilding(tile, buildingTypeToPlace, this.player)) {
+      // Create a new Building instance based on what's in the player's hand.
+      const newBuilding = new Building(buildingTypeToPlace);
+      tile.setContent(newBuilding);
+      console.log(`Placed '${buildingTypeToPlace}' on tile (${tile.x}, ${tile.y})`);
+
+      // Announce that a building has been placed for other systems to react to.
+      this.eventEmitter.emit('BUILDING_PLACED', tile);
+
+      // After placing, the player draws a new tile.
+      this.player.drawNewTile();
     }
   }
 }

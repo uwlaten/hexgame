@@ -15,18 +15,4 @@ export default {
     width: 25,
     height: 20,
   },
-
-  /**
-   * A list of all possible biome types that can appear on a game tile.
-   * This list can be used for map generation and to determine tile properties.
-   */
-  biomes: [
-    'ocean',
-    'mountain',
-    'desert',
-    'grassland',
-    'plains',
-    'tundra',
-    'lake',
-  ],
 };

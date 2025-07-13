@@ -1,6 +1,7 @@
 /**
  * @fileoverview Defines the UI class for drawing interface elements.
  */
+import { BuildingLibrary } from './BuildingLibrary.js';
 
 /**
  * Handles the rendering of all User Interface elements, such as text,
@@ -25,7 +26,20 @@ export default class UI {
    * Draws all UI elements onto the canvas. This is the main entry point for UI rendering.
    */
   draw() {
+    this._drawScoreDisplay();
     this._drawNextTileDisplay();
+  }
+
+  /**
+   * Draws the player's score in the top-left corner of the header.
+   * @private
+   */
+  _drawScoreDisplay() {
+    this.ctx.fillStyle = 'white';
+    this.ctx.font = 'bold 20px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(`Score: ${this.player.score}`, 20, this.headerHeight / 2);
   }
 
   /**
@@ -33,6 +47,11 @@ export default class UI {
    * @private
    */
   _drawNextTileDisplay() {
+    if (!this.player.currentTileInHand) {
+      // Don't draw the display if the hand is empty.
+      return;
+    }
+
     const displayHexSize = this.hexSize * 1.5;
     // Position the hex icon near the right edge to make room for the text.
     const hexX = this.ctx.canvas.width - displayHexSize * 1.5;
@@ -49,7 +68,7 @@ export default class UI {
     this._drawHexagon(hexX, hexY, displayHexSize, '#f0e6c'); // Plains color
 
     // Draw the icon for the tile in hand
-    if (this.player.currentTileInHand === 'Residence') {
+    if (this.player.currentTileInHand === BuildingLibrary.RESIDENCE.id) {
       this.ctx.fillStyle = '#8B4513'; // SaddleBrown
       this.ctx.beginPath();
       this.ctx.arc(hexX, hexY, displayHexSize * 0.5, 0, 2 * Math.PI);

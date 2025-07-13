@@ -3,26 +3,13 @@
  */
 
 import HexTile from './HexTile.js';
+import { Building } from './Building.js';
+import { BuildingLibrary } from './BuildingLibrary.js';
 
 /**
  * Handles all drawing operations on the HTML canvas.
  */
 export default class Renderer {
-  /**
-   * A mapping of biome types to their corresponding colors for rendering.
-   * @type {Object.<string, string>}
-   */
-  static biomeColors = {
-    ocean: '#4f93a8',
-    lake: '#63b4cf',
-    mountain: '#808080',
-    desert: '#d2b48c',
-    grassland: '#98fb98',
-    plains: '#f0e68c',
-    tundra: '#f0f8ff',
-    default: '#cccccc', // A default color for unknown biomes
-  };
-
   /**
    * Creates an instance of the Renderer.
    * @param {HTMLCanvasElement} canvas The canvas element to draw on.
@@ -72,7 +59,7 @@ export default class Renderer {
     const cx = this.hexSize * Math.sqrt(3) * (tile.x + 0.5 * (tile.y & 1));
     const cy = this.hexSize * (3 / 2) * tile.y;
 
-    const color = Renderer.biomeColors[tile.biomeType] || Renderer.biomeColors.default;
+    const color = tile.biome.color || '#cccccc'; // Use the color from the biome object.
 
     this.ctx.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -99,7 +86,7 @@ export default class Renderer {
     this.ctx.stroke();
 
     // If the tile has content, draw it.
-    if (tile.contentType === 'Residence') {
+    if (tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RESIDENCE.id) {
       this.ctx.fillStyle = '#8B4513'; // SaddleBrown for a residence
       this.ctx.beginPath();
       this.ctx.arc(cx, cy, this.hexSize * 0.5, 0, 2 * Math.PI);

@@ -12,6 +12,8 @@ import Player from './Player.js';
 import Game from './Game.js';
 import UI from './UI.js';
 import InputHandler from './InputHandler.js';
+import ScoringEngine from './ScoringEngine.js';
+import { ResidenceOnPlainsRule } from './ScoringRules.js';
 import Config from './Config.js';
 
 /**
@@ -33,7 +35,7 @@ function main() {
   // --- 2. INITIALIZATION ---
   // The event emitter is the central hub for game events.
   const eventEmitter = new EventEmitter();
-  const player = new Player();
+  const player = new Player(eventEmitter);
 
   const gameMap = new Map();
   MapGenerator.generate(gameMap);
@@ -55,6 +57,12 @@ function main() {
   // The Game class orchestrates the main game logic.
   const game = new Game(eventEmitter, player);
   game.init();
+
+  // The ScoringEngine manages all scoring logic.
+  const scoringEngine = new ScoringEngine(eventEmitter, player);
+  // Register the rules we want to use for this game.
+  scoringEngine.addRule(new ResidenceOnPlainsRule());
+  scoringEngine.init();
 
   // The UI class handles drawing interface elements like scores and menus.
   const ui = new UI(renderer.ctx, player, hexSize, headerHeight);
