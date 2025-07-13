@@ -11,10 +11,12 @@ export default class GameLoop {
    * Creates an instance of the GameLoop.
    * @param {import('./Renderer.js').default} renderer The renderer instance to use for drawing.
    * @param {import('./Map.js').default} map The map instance to be rendered.
+   * @param {import('./UI.js').default} ui The UI instance for drawing interface elements.
    */
-  constructor(renderer, map) {
+  constructor(renderer, map, ui) {
     this.renderer = renderer;
     this.map = map;
+    this.ui = ui;
     this.animationFrameId = null;
     this.isRunning = false;
   }
@@ -28,6 +30,9 @@ export default class GameLoop {
 
     // Render the current state of the map.
     this.renderer.drawMap(this.map);
+
+    // Render the UI on top of the map.
+    this.ui.draw();
 
     // Request the next animation frame to continue the loop.
     this.animationFrameId = requestAnimationFrame(this._loop.bind(this));

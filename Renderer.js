@@ -27,8 +27,9 @@ export default class Renderer {
    * Creates an instance of the Renderer.
    * @param {HTMLCanvasElement} canvas The canvas element to draw on.
    * @param {number} hexSize The size (radius) of a single hexagon tile from its center to a corner.
+   * @param {number} [headerHeight=0] The height of the header area above the map.
    */
-  constructor(canvas, hexSize) {
+  constructor(canvas, hexSize, headerHeight = 0) {
     /**
      * The HTML canvas element.
      * @type {HTMLCanvasElement}
@@ -46,6 +47,12 @@ export default class Renderer {
      * @type {number}
      */
     this.hexSize = hexSize;
+
+    /**
+     * The height of the UI area at the top of the canvas.
+     * @type {number}
+     */
+    this.headerHeight = headerHeight;
 
     /**
      * Padding around the map in pixels to prevent border clipping.
@@ -90,6 +97,14 @@ export default class Renderer {
     this.ctx.strokeStyle = '#333'; // A dark border color
     this.ctx.lineWidth = 1;
     this.ctx.stroke();
+
+    // If the tile has content, draw it.
+    if (tile.contentType === 'Residence') {
+      this.ctx.fillStyle = '#8B4513'; // SaddleBrown for a residence
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, this.hexSize * 0.5, 0, 2 * Math.PI);
+      this.ctx.fill();
+    }
   }
 
   /**
@@ -112,6 +127,54 @@ export default class Renderer {
   }
 
   /**
+   * Converts pixel coordinates from the canvas to hexagonal grid coordinates.
+   * This implementation is based on the excellent guide from Red Blob Games.
+   * @param {number} pixelX The x-coordinate of the click on the canvas.
+   * @param {number} pixelY The y-coordinate of the click on the canvas.
+   * @returns {{x: number, y: number}} The grid coordinates (column, row) of the hex.
+   */
+  pixelToHex(pixelX, pixelY) {
+    // 1. Adjust for the canvas translation applied during rendering.
+    const translateX = (this.hexSize * Math.sqrt(3)) / 2 + this._padding;
+    const translateY = this.hexSize + this._padding + this.headerHeight;
+    const worldX = pixelX - translateX;
+    const worldY = pixelY - translateY;
+
+    // 2. Convert world pixel coordinates to fractional axial coordinates (q, r).
+    // This is for pointy-top hexes.
+    const q = ((Math.sqrt(3) / 3) * worldX - (1 / 3) * worldY) / this.hexSize;
+    const r = ((2 / 3) * worldY) / this.hexSize;
+
+    // 3. Convert fractional axial to fractional cube coordinates (x, y, z).
+    const x = q;
+    const z = r;
+    const y = -x - z;
+
+    // 4. Round cube coordinates to the nearest integer hex.
+    let rx = Math.round(x);
+    let ry = Math.round(y);
+    let rz = Math.round(z);
+
+    const x_diff = Math.abs(rx - x);
+    const y_diff = Math.abs(ry - y);
+    const z_diff = Math.abs(rz - z);
+
+    if (x_diff > y_diff && x_diff > z_diff) {
+      rx = -ry - rz;
+    } else if (y_diff > z_diff) {
+      ry = -rx - rz;
+    } else {
+      rz = -rx - ry;
+    }
+
+    // 5. Convert the rounded cube coordinates back to "odd-r" offset coordinates.
+    const col = rx + (rz - (rz & 1)) / 2;
+    const row = rz;
+
+    return { x: col, y: row };
+  }
+
+  /**
    * Clears the canvas and draws the entire map.
    * @param {import('./Map.js').default} map The map object to draw.
    */
@@ -126,7 +189,7 @@ export default class Renderer {
     // The padding part ensures the stroke is not clipped.
     this.ctx.translate(
       (this.hexSize * Math.sqrt(3)) / 2 + this._padding,
-      this.hexSize + this._padding
+      this.hexSize + this._padding + this.headerHeight
     );
 
     for (const row of map.grid) {

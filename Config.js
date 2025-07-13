@@ -12,7 +12,7 @@ export default {
    * height: The number of tiles vertically.
    */
   mapDimensions: {
-    width: 30,
+    width: 25,
     height: 20,
   },
 
