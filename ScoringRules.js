@@ -29,20 +29,20 @@ export class ScoringRule {
 }
 
 /**
- * A specific scoring rule that awards points for placing a Residence on a Plains tile.
+ * A specific scoring rule that awards points for placing a Residence on a Savannah tile.
  */
-export class ResidenceOnPlainsRule extends ScoringRule {
+export class ResidenceOnSavannahRule extends ScoringRule {
   /**
-   * Awards 1 point if a Residence is on a Plains tile.
+   * Awards 1 point if a Residence is on a Savannah tile.
    * @override
    * @param {import('./HexTile.js').default} tile The tile where a building was placed.
    * @returns {number} 1 if the condition is met, otherwise 0.
    */
   evaluate(tile) {
     const isResidence = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RESIDENCE.id;
-    const isPlains = tile.biome.id === BiomeLibrary.PLAINS.id;
+    const isSavannah = tile.biome.id === BiomeLibrary.SAVANNAH.id;
 
-    if (isResidence && isPlains) {
+    if (isResidence && isSavannah) {
       return 1;
     }
     return 0;

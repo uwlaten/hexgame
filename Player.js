@@ -23,13 +23,7 @@ export default class Player {
      * The collection of building types the player can draw from.
      * @type {string[]}
      */
-    this.deck = [
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-    ];
+    this.deck = this._getInitialDeck();
 
     /**
      * The type of tile the player currently has selected to place on the map.
@@ -38,6 +32,19 @@ export default class Player {
     this.currentTileInHand = null;
 
     this.drawNewTile();
+
+    // Announce the initial score so the UI can display it.
+    this.eventEmitter.emit('SCORE_UPDATED', this.score);
+  }
+
+  /**
+   * Resets the player's state to the beginning of a new game.
+   */
+  reset() {
+    this.score = 0;
+    this.deck = this._getInitialDeck();
+    this.drawNewTile(); // This will emit hand and score updates
+    this.eventEmitter.emit('SCORE_UPDATED', this.score);
   }
 
   /**
@@ -55,5 +62,20 @@ export default class Player {
     }
 
     this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+  }
+
+  /**
+   * Returns the initial set of cards for the player's deck.
+   * @returns {string[]}
+   * @private
+   */
+  _getInitialDeck() {
+    return [
+      BuildingLibrary.RESIDENCE.id,
+      BuildingLibrary.RESIDENCE.id,
+      BuildingLibrary.RESIDENCE.id,
+      BuildingLibrary.RESIDENCE.id,
+      BuildingLibrary.RESIDENCE.id,
+    ];
   }
 }

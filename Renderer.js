@@ -14,9 +14,8 @@ export default class Renderer {
    * Creates an instance of the Renderer.
    * @param {HTMLCanvasElement} canvas The canvas element to draw on.
    * @param {number} hexSize The size (radius) of a single hexagon tile from its center to a corner.
-   * @param {number} [headerHeight=0] The height of the header area above the map.
    */
-  constructor(canvas, hexSize, headerHeight = 0) {
+  constructor(canvas, hexSize) {
     /**
      * The HTML canvas element.
      * @type {HTMLCanvasElement}
@@ -34,12 +33,6 @@ export default class Renderer {
      * @type {number}
      */
     this.hexSize = hexSize;
-
-    /**
-     * The height of the UI area at the top of the canvas.
-     * @type {number}
-     */
-    this.headerHeight = headerHeight;
 
     /**
      * Padding around the map in pixels to prevent border clipping.
@@ -85,6 +78,16 @@ export default class Renderer {
     this.ctx.lineWidth = 1;
     this.ctx.stroke();
 
+    // If the biome itself has special drawing instructions (like waves on water), draw them.
+    if (tile.biome.draw) {
+      this._drawDetails(tile.biome, cx, cy);
+    }
+
+    // If the tile has a feature (like hills), draw it on top of the biome.
+    if (tile.feature) {
+      this._drawDetails(tile.feature, cx, cy);
+    }
+
     // If the tile has content, draw it.
     if (tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RESIDENCE.id) {
       this.ctx.fillStyle = '#8B4513'; // SaddleBrown for a residence
@@ -92,6 +95,63 @@ export default class Renderer {
       this.ctx.arc(cx, cy, this.hexSize * 0.5, 0, 2 * Math.PI);
       this.ctx.fill();
     }
+  }
+
+  /**
+   * Draws detailed graphics for a biome or feature on a tile.
+   * This method interprets the 'draw' property of a biome or feature object.
+   * @param {object} drawable The biome or feature object containing drawing instructions.
+   * @param {number} cx The center x-coordinate of the hex.
+   * @param {number} cy The center y-coordinate of the hex.
+   * @private
+   */
+  _drawDetails(drawable, cx, cy) {
+    if (!drawable.draw) return; // Nothing to draw.
+
+    this.ctx.save();
+    // Translate the canvas origin to the center of the hex for relative drawing.
+    this.ctx.translate(cx, cy);
+
+    if (drawable.draw.type === 'shapes') {
+      for (const shape of drawable.draw.shapes) {
+        this.ctx.beginPath();
+
+        // Set styles for this specific shape, with fallbacks to the feature-level style.
+        this.ctx.fillStyle = shape.fillStyle || 'transparent';
+        this.ctx.strokeStyle = shape.strokeStyle || drawable.draw.strokeStyle || 'transparent';
+        this.ctx.lineWidth = shape.lineWidth || drawable.draw.lineWidth || 1;
+
+        if (shape.type === 'arc') {
+          const [arcX, arcY, radius, startAngle, endAngle] = shape.params;
+          this.ctx.arc(arcX, arcY, radius, startAngle, endAngle);
+        } else if (shape.type === 'rect') {
+          const [rectX, rectY, width, height] = shape.params;
+          this.ctx.rect(rectX, rectY, width, height);
+        } else if (shape.type === 'circle') {
+          const [circX, circY, radius] = shape.params;
+          this.ctx.arc(circX, circY, radius, 0, 2 * Math.PI);
+        } else if (shape.type === 'polygon') {
+          const points = shape.params;
+          if (points && points.length > 1) {
+            this.ctx.moveTo(points[0][0], points[0][1]);
+            for (let i = 1; i < points.length; i++) {
+              this.ctx.lineTo(points[i][0], points[i][1]);
+            }
+            this.ctx.closePath();
+          }
+        }
+
+        // Draw the shape based on the styles provided.
+        if (this.ctx.fillStyle !== 'transparent') {
+          this.ctx.fill();
+        }
+        if (this.ctx.strokeStyle !== 'transparent') {
+          this.ctx.stroke();
+        }
+      }
+    }
+
+    this.ctx.restore(); // Restore the canvas origin.
   }
 
   /**
@@ -122,9 +182,9 @@ export default class Renderer {
    */
   pixelToHex(pixelX, pixelY) {
     // 1. Adjust for the canvas translation applied during rendering.
-    const translateX = (this.hexSize * Math.sqrt(3)) / 2 + this._padding;
-    const translateY = this.hexSize + this._padding + this.headerHeight;
-    const worldX = pixelX - translateX;
+    const translateX = (this.hexSize * Math.sqrt(3)) / 2 + this._padding; 
+    const translateY = this.hexSize + this._padding;
+    const worldX = pixelX - translateX; 
     const worldY = pixelY - translateY;
 
     // 2. Convert world pixel coordinates to fractional axial coordinates (q, r).
@@ -175,8 +235,8 @@ export default class Renderer {
     // The first part of the translation aligns the grid's geometric edge.
     // The padding part ensures the stroke is not clipped.
     this.ctx.translate(
-      (this.hexSize * Math.sqrt(3)) / 2 + this._padding,
-      this.hexSize + this._padding + this.headerHeight
+      (this.hexSize * Math.sqrt(3)) / 2 + this._padding, 
+      this.hexSize + this._padding
     );
 
     for (const row of map.grid) {
