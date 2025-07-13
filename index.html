@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hex Game v2</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background-color: #111;
+      color: #eee;
+      /* Center the main content block */
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+    .game-container {
+      background-color: #222;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+    h1 {
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="game-container">
+    <h1>Hex Game v2</h1>
+    <canvas id="gameCanvas"></canvas>
+  </main>
+  <!-- The 'type="module"' attribute is essential for using ES6 imports/exports -->
+  <script type="module" src="main.js"></script>
+</body>
+</html>
