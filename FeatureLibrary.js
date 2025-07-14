@@ -16,11 +16,11 @@ export const FeatureLibrary = {
       useSizeFactor: true, // Indicates that params should be scaled by hexSize.
       shapes: [
         // An array of shapes to draw, with coordinates as factors of hexSize.
-        { type: 'arc', params: [-0.53, -0.13, 0.27, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [0.53, -0.13, 0.27, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [0, 0.13, 0.33, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [-0.33, 0.53, 0.27, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [0.33, 0.53, 0.27, Math.PI, 2 * Math.PI] },
+        { type: 'arc', params: [-0.55, -0.2, 0.22, Math.PI, 2 * Math.PI] }, // Top-left
+        { type: 'arc', params: [0.55, -0.2, 0.22, Math.PI, 2 * Math.PI] },  // Top-right
+        { type: 'arc', params: [0, 0.1, 0.28, Math.PI, 2 * Math.PI] },    // Center
+        { type: 'arc', params: [-0.35, 0.6, 0.22, Math.PI, 2 * Math.PI] }, // Bottom-left
+        { type: 'arc', params: [0.35, 0.6, 0.22, Math.PI, 2 * Math.PI] },  // Bottom-right
       ],
     },
   },

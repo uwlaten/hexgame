@@ -32,8 +32,13 @@ export default class DrawingUtils {
 
         // Scale parameters if useSizeFactor is true.
         if (drawable.draw.useSizeFactor) {
-          if (shape.type === 'circle' || shape.type === 'arc') { // params: [cx, cy, radiusFactor]
+          if (shape.type === 'circle') { // params: [cx, cy, radius]
             params = params.map(p => p * hexSize);
+          } else if (shape.type === 'arc') { // params: [cx, cy, radius, startAngle, endAngle]
+            // Only scale position and radius, not angles
+            params[0] *= hexSize;
+            params[1] *= hexSize;
+            params[2] *= hexSize;
           } else if (shape.type === 'rect') { // params: [x, y, w, h]
             params = params.map(p => p * hexSize);
           } else if (shape.type === 'polygon') { // params: [[x1, y1], [x2, y2], ...]
