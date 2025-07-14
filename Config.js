@@ -88,7 +88,7 @@ export default {
    */
   RendererConfig: {
     // The radius of a hex tile in pixels from its center to a corner.
-    hexSize: 15,
+    hexSize: 20,
     // Padding around the map in pixels to prevent border clipping.
     padding: 1,
     hexBorderStyle: {
@@ -128,7 +128,7 @@ export default {
     nextTileDisplay: {
       width: 60,
       height: 60,
-      hexSize: 20,
+      hexSize: 25,
     },
   },
 };

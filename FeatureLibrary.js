@@ -23,11 +23,23 @@ export const FeatureLibrary = {
         { type: 'arc', params: [0.35, 0.6, 0.22, Math.PI, 2 * Math.PI] },  // Bottom-right
       ],
     },
+    possibleResources: [
+      { resourceId: 'Stone', chance: 0.15 },
+      { resourceId: 'Iron', chance: 0.08 },
+    ],
+    // Hills should prevent Grain from the underlying biome from spawning.
+    biomeResourceInteraction: {
+      mode: 'block',
+      resourceIds: ['Grain'],
+    },
   },
   FOREST: {
     id: 'forest',
     name: 'Forest',
     elevationModifier: 0, // Forests don't change the ground elevation
+    possibleResources: [
+      { resourceId: 'Wood', chance: 0.2 }, // Forests have a 20% chance to have a Wood resource.
+    ],
     draw: {
       type: 'shapes',
       useSizeFactor: true,
@@ -49,6 +61,11 @@ export const FeatureLibrary = {
         { type: 'polygon', fillStyle: '#2E8B57', params: [ [-0.53, 0.6], [0, 0.6], [-0.27, 0.27] ] },    // Bottom-left
         { type: 'polygon', fillStyle: '#2E8B57', params: [ [0, 0.6], [0.53, 0.6], [0.27, 0.27] ] },     // Bottom-right
       ],
+    },
+    // Forests should prevent any resource from the underlying biome from spawning.
+    biomeResourceInteraction: {
+      mode: 'block',
+      resourceIds: ['*'], // '*' is a wildcard for all resources.
     },
   },
 };

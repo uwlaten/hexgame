@@ -5,6 +5,7 @@
 import DrawingUtils from './DrawingUtils.js';
 import Config from './Config.js';
 import { BuildingLibrary } from './BuildingLibrary.js';
+import { Building } from './Building.js';
 
 /**
  * Manages all HTML-based UI components. It creates the elements,
@@ -199,6 +200,18 @@ export default class UIManager {
       let tooltipText = `Coords: (${tile.x}, ${tile.y}) | Biome: ${tile.biome.name}`;
       if (tile.feature) {
         tooltipText += ` | Feature: ${tile.feature.name}`;
+      }
+
+      // Add information about the tile's content (building or resource).
+      if (tile.contentType) {
+        // The contentType can be an instance of Building or a plain object from the ResourceLibrary.
+        if (tile.contentType instanceof Building) {
+          // For buildings, the 'type' property holds the name (e.g., 'Residence').
+          tooltipText += ` | Building: ${tile.contentType.type}`;
+        } else {
+          // For resources, the 'name' property holds the name (e.g., 'Iron').
+          tooltipText += ` | Resource: ${tile.contentType.name}`;
+        }
       }
 
       this.tooltipContainer.textContent = tooltipText;

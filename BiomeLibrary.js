@@ -11,6 +11,14 @@ export const BiomeLibrary = {
     isBuildable: false,
     canSupportFeatures: false,
     elevation: 0, // Lowest point
+    possibleResources: [
+      {
+        resourceId: 'Fish',
+        chance: 0.1, // 10% chance for Fish in coastal waters
+        // This resource can only spawn if the tile is adjacent to at least one buildable (land) tile.
+        conditions: [{ type: 'neighbor', property: 'biome.isBuildable', value: true, operator: 'atLeast', count: 1 }],
+      },
+    ],
   },
   LAKE: {
     id: 'lake',
@@ -19,6 +27,9 @@ export const BiomeLibrary = {
     isBuildable: false,
     canSupportFeatures: false,
     elevation: 1, // Above ocean, but low
+    possibleResources: [
+      { resourceId: 'Fish', chance: 0.15 }, // Lakes have a higher base chance for fish.
+    ],
   },
   ICE: {
     id: 'ice',
@@ -71,6 +82,16 @@ export const BiomeLibrary = {
       moisture: ['normal', 'wet'],
     },
     canSupportFeatures: true,
+    possibleResources: [
+      // A base chance for grain to appear anywhere in grasslands.
+      { resourceId: 'Grain', chance: 0.05 },
+      // A much higher chance for grain on fertile tiles next to a river.
+      {
+        resourceId: 'Grain',
+        chance: 0.4,
+        conditions: [{ type: 'adjacentToRiver' }],
+      },
+    ],
   },
   SAVANNAH: {
     id: 'savannah',

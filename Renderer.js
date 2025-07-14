@@ -99,12 +99,20 @@ export default class Renderer {
       DrawingUtils.drawDetails(this.ctx, tile.feature, cx, cy, this.hexSize);
     }
 
-    // If the tile has content (like a building), draw it.
-    if (tile.contentType instanceof Building) {
-      // Look up the building's definition in the library using its type ID.
-      const buildingDefinition = Object.values(BuildingLibrary).find(b => b.id === tile.contentType.type);
-      if (buildingDefinition?.draw) {
-        DrawingUtils.drawDetails(this.ctx, buildingDefinition, cx, cy, this.hexSize);
+    // If the tile has content (like a building or resource), draw it.
+    if (tile.contentType) {
+      let definitionToDraw = null;
+      if (tile.contentType instanceof Building) {
+        // For Buildings, we look up the definition in the library.
+        definitionToDraw = Object.values(BuildingLibrary).find(b => b.id === tile.contentType.type);
+      } else {
+        // For Resources, the contentType *is* the definition.
+        definitionToDraw = tile.contentType;
+      }
+
+      // Use the drawing utility to render the icon for the building or resource.
+      if (definitionToDraw?.draw) {
+        DrawingUtils.drawDetails(this.ctx, definitionToDraw, cx, cy, this.hexSize);
       }
     }
   }

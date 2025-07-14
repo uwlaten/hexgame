@@ -8,6 +8,7 @@ import HexTile from './HexTile.js';
 import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
 import { FeatureLibrary } from './FeatureLibrary.js';
+import { ResourceLibrary } from './ResourceLibrary.js';
 import { createNoise2D } from 'https://cdn.skypack.dev/simplex-noise';
 
 /**
@@ -92,6 +93,9 @@ export default class MapGenerator {
 
     // 9. Generate rivers.
     this._generateRivers(map, log);
+
+    // NEW: Place resources on the map.
+    this._generateResources(map);
 
     // 10. Run final post-processing passes to clean up the map.
     this._runPostProcessingPasses(map, placeholderBiome);
@@ -1430,5 +1434,132 @@ export default class MapGenerator {
         }
       }
     }
+  }
+
+  /**
+   * Places resources on the map based on biome and feature rules.
+   * This is the main orchestrator for the resource placement phase.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @private
+   */
+  static _generateResources(map) {
+    for (const tile of map.grid.flat()) {
+      // A tile can only have one piece of content. If it's already occupied, skip.
+      if (tile.contentType) continue;
+
+      let resourcePlaced = false;
+      // Start with the biome's potential resources. Make a copy to avoid mutation.
+      let biomeRules = tile.biome.possibleResources ? [...tile.biome.possibleResources] : [];
+
+      // --- Feature-First Precedence ---
+      if (tile.feature) {
+        // Check for a specific override for this biome-feature combination.
+        let featureRules = tile.feature.resourceOverrides?.[tile.biome.id]
+          // If no override, use the feature's default list.
+          || tile.feature.possibleResources
+          || [];
+
+        if (this._tryPlaceResource(tile, featureRules, map)) {
+          resourcePlaced = true;
+        }
+
+        // --- Biome Resource Interaction ---
+        const interaction = tile.feature.biomeResourceInteraction;
+        if (interaction) {
+          if (interaction.mode === 'block') {
+            if (interaction.resourceIds.includes('*')) {
+              // The '*' wildcard blocks all biome resources.
+              biomeRules = [];
+            } else {
+              // Filter out the specific resources listed in the block list.
+              const blockedIds = new Set(interaction.resourceIds);
+              biomeRules = biomeRules.filter(rule => !blockedIds.has(rule.resourceId));
+            }
+          }
+          // 'allow' mode could be implemented here if needed.
+        }
+      }
+
+      // --- Biome Resource Placement ---
+      // If no resource was placed by a feature, and there are valid biome rules left...
+      if (!resourcePlaced && biomeRules.length > 0) {
+        this._tryPlaceResource(tile, biomeRules, map);
+      }
+    }
+  }
+
+  /**
+   * Attempts to place a resource on a tile based on a list of rules.
+   * It iterates through rules, checks conditions, and rolls for chance.
+   * @param {import('./HexTile.js').default} tile The tile to place a resource on.
+   * @param {Array<object>} rules The resource rules to process.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {boolean} True if a resource was successfully placed.
+   * @private
+   */
+  static _tryPlaceResource(tile, rules, map) {
+    for (const rule of rules) {
+      if (this._checkConditions(tile, rule.conditions, map)) {
+        if (Math.random() < rule.chance) {
+          // Find the resource definition in the library using its ID.
+          const resourceDef = ResourceLibrary[rule.resourceId.toUpperCase()];
+          if (resourceDef) {
+            tile.setContent(resourceDef);
+            return true; // A resource was placed, so we stop processing rules for this tile.
+          }
+        }
+      }
+    }
+    return false; // No resource was placed from this set of rules.
+  }
+
+  /**
+   * Checks if a tile meets a set of conditions for resource placement.
+   * @param {import('./HexTile.js').default} tile The tile to check.
+   * @param {Array<object>|undefined} conditions The array of condition objects.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {boolean} True if all conditions are met (or if there are no conditions).
+   * @private
+   */
+  static _checkConditions(tile, conditions, map) {
+    if (!conditions || conditions.length === 0) return true;
+
+    for (const condition of conditions) {
+      switch (condition.type) {
+        case 'neighbor': {
+          const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+          const matchCount = neighbors.filter(n => this._getPropertyByPath(n, condition.property) === condition.value).length;
+
+          if (condition.operator === 'atLeast' && matchCount < condition.count) return false;
+          // Other operators like 'exactly' or 'lessThan' could be added here.
+          break;
+        }
+        case 'adjacentToRiver': {
+          const vertices = this._getVerticesForTile(tile, map);
+          let hasRiver = false;
+          for (let i = 0; i < 6; i++) {
+            const edgeId = HexGridUtils.getEdgeId(vertices[i], vertices[(i + 1) % 6]);
+            if (map.rivers.has(edgeId)) {
+              hasRiver = true;
+              break;
+            }
+          }
+          if (!hasRiver) return false;
+          break;
+        }
+      }
+    }
+    return true; // All conditions passed.
+  }
+
+  /**
+   * Safely gets a nested property from an object using a string path.
+   * @param {object} obj The object to query.
+   * @param {string} path The path to the property (e.g., 'biome.isBuildable').
+   * @returns {*} The property value or undefined if not found.
+   * @private
+   */
+  static _getPropertyByPath(obj, path) {
+    return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
   }
 }
