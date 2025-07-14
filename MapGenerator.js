@@ -624,12 +624,12 @@ export default class MapGenerator {
   }
 
   /**
-   * Runs a series of post-processing passes to clean up the map and enforce rules.
+   * Fixes biomes that are in illogical locations, like deserts in the arctic.
    * @param {import('./Map.js').default} map The map object to modify.
    * @param {object} placeholderBiome The biome object used as the default land tile.
    * @private
    */
-  static _runPostProcessingPasses(map, placeholderBiome) {
+  static _fixProblematicBiomes(map, placeholderBiome) {
     const tilesToConvert = [];
     const allTiles = map.grid.flat();
     const tundraTiles = allTiles.filter(t => t.biome.id === BiomeLibrary.TUNDRA.id);
@@ -681,6 +681,23 @@ export default class MapGenerator {
       // Convert to the most common valid neighbor, defaulting to the placeholder biome.
       tile.biome = (grasslandNeighbors > savannahNeighbors) ? BiomeLibrary.GRASSLAND : placeholderBiome;
     }
+  }
+
+  /**
+   * Runs a series of post-processing passes to clean up the map and enforce rules.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @param {object} placeholderBiome The biome object used as the default land tile.
+   * @private
+   */
+  static _runPostProcessingPasses(map, placeholderBiome) {
+    // Pass 1: Fix problematic biome placements (the original logic).
+    this._fixProblematicBiomes(map, placeholderBiome);
+
+    // Pass 2: Smooth out isolated "island" biomes based on their neighbors.
+    this._smoothBiomeIslands(map);
+
+    // Pass 3: Convert small, land-locked oceans into lakes.
+    this._convertInlandSeasToLakes(map);
   }
 
   /**
@@ -840,6 +857,121 @@ export default class MapGenerator {
       case 'bottom': return { dx: 0, dy: -1 };
       case 'right': return { dx: -1, dy: 0 };
       case 'left': default: return { dx: 1, dy: 0 };
+    }
+  }
+
+  /**
+   * Smoothes out single-tile biome "islands" by converting them to their most common neighbor.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @private
+   */
+  static _smoothBiomeIslands(map) {
+    const conversions = [];
+    // These biomes are structural and should not be converted, nor should they
+    // influence the conversion of their neighbors.
+    const biomesToIgnore = new Set([
+      BiomeLibrary.MOUNTAIN.id,
+      BiomeLibrary.ICE.id,
+      BiomeLibrary.OCEAN.id,
+    ]);
+
+    for (const tile of map.grid.flat()) {
+      // We only consider converting non-structural, buildable land biomes.
+      if (biomesToIgnore.has(tile.biome.id) || !tile.biome.isBuildable) {
+        continue;
+      }
+
+      const biomeCounts = {};
+      for (const coord of this._getNeighbors(tile.x, tile.y)) {
+        const neighbor = map.getTileAt(coord.x, coord.y);
+        // When counting, we ignore neighbors that are structural.
+        if (neighbor && !biomesToIgnore.has(neighbor.biome.id)) {
+          const biomeId = neighbor.biome.id;
+          biomeCounts[biomeId] = (biomeCounts[biomeId] || 0) + 1;
+        }
+      }
+
+      // If the tile has any neighbor of its own kind, it's not an island. Skip it.
+      if (biomeCounts[tile.biome.id]) {
+        continue;
+      }
+
+      if (Object.keys(biomeCounts).length === 0) continue;
+
+      // Find the most common neighbor biome(s).
+      let maxCount = 0;
+      let majorityBiomes = [];
+      for (const biomeId in biomeCounts) {
+        if (biomeCounts[biomeId] > maxCount) {
+          maxCount = biomeCounts[biomeId];
+          majorityBiomes = [biomeId];
+        } else if (biomeCounts[biomeId] === maxCount) {
+          majorityBiomes.push(biomeId);
+        }
+      }
+
+      // If there is a single, clear majority biome among the neighbors, convert the island.
+      // We don't need to check if the majority is different from the tile's own biome,
+      // because we already confirmed this tile has no neighbors of its own kind.
+      if (majorityBiomes.length === 1) {
+        const newBiome = Object.values(BiomeLibrary).find(b => b.id === majorityBiomes[0]);
+        if (newBiome) {
+          conversions.push({ tile, newBiome });
+        }
+      }
+    }
+
+    // Apply all conversions at the end to avoid chain reactions in a single pass.
+    for (const { tile, newBiome } of conversions) {
+      tile.biome = newBiome;
+    }
+  }
+
+  /**
+   * Finds small, land-locked bodies of ocean and converts them to lakes.
+   * This uses a Breadth-First Search (BFS) to find connected components of ocean tiles.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @private
+   */
+  static _convertInlandSeasToLakes(map) {
+    const visited = new Set();
+
+    for (const startTile of map.grid.flat()) {
+      // Start a search only if we find an unvisited ocean tile.
+      if (startTile.biome.id === BiomeLibrary.OCEAN.id && !visited.has(startTile)) {
+        const component = [];
+        const queue = [startTile];
+        visited.add(startTile);
+        let isSurrounded = true;
+
+        let head = 0;
+        while (head < queue.length) {
+          const currentTile = queue[head++];
+          component.push(currentTile);
+
+          // If any tile in the component touches the map edge, it's part of the world ocean.
+          if (currentTile.x === 0 || currentTile.x === map.width - 1 || currentTile.y === 0 || currentTile.y === map.height - 1) {
+            isSurrounded = false;
+          }
+
+          // Add its unvisited ocean neighbors to the queue to continue the search.
+          for (const coord of this._getNeighbors(currentTile.x, currentTile.y)) {
+            const neighbor = map.getTileAt(coord.x, coord.y);
+            if (neighbor && neighbor.biome.id === BiomeLibrary.OCEAN.id && !visited.has(neighbor)) {
+              visited.add(neighbor);
+              queue.push(neighbor);
+            }
+          }
+        }
+
+        // After the search is complete, evaluate the component.
+        // If it's fully surrounded by land and has a size of 1 or 2, convert it to a lake.
+        if (isSurrounded && (component.length === 1 || component.length === 2)) {
+          for (const tile of component) {
+            tile.biome = BiomeLibrary.LAKE;
+          }
+        }
+      }
     }
   }
 }

@@ -19,6 +19,7 @@ export default class UIManager {
     this.configPanelContainer = document.getElementById('config-panel');
     this.scoreContainer = document.getElementById('score-container');
     this.nextTileContainer = document.getElementById('next-tile-container');
+    this.tooltipContainer = null;
 
     // Create the elements that will be managed by this class.
     this.scoreDisplay = null;
@@ -40,10 +41,12 @@ export default class UIManager {
     this._createNewGameButton();
     this._createScoreDisplay();
     this._createNextTileDisplay();
+    this._createTooltipDisplay();
 
     // Subscribe to game events to keep the UI in sync.
     this.eventEmitter.on('SCORE_UPDATED', score => this.updateScore(score));
     this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', tileId => this.updateNextTile(tileId));
+    this.eventEmitter.on('HEX_HOVERED', payload => this.updateTooltip(payload));
   }
 
   /**
@@ -143,6 +146,14 @@ export default class UIManager {
   }
 
   /**
+   * Gets a reference to the tooltip container element from the DOM.
+   * @private
+   */
+  _createTooltipDisplay() {
+    this.tooltipContainer = document.getElementById('tooltip-container');
+  }
+
+  /**
    * Creates the "Next Tile" display, which includes a text label and a canvas for the icon.
    * @private
    */
@@ -169,6 +180,34 @@ export default class UIManager {
    */
   updateScore(score) {
     this.scoreDisplay.textContent = `Score: ${score}`;
+  }
+
+  /**
+   * Updates the tooltip's content and position based on the hovered tile.
+   * @param {{tile: import('./HexTile.js').default|null, event: MouseEvent|null}} payload The event payload from the InputHandler.
+   */
+  updateTooltip(payload) {
+    const { tile, event } = payload;
+
+    if (tile && event) {
+      // Construct the tooltip text, including the feature name if one exists.
+      let tooltipText = `Coords: (${tile.x}, ${tile.y}) | Biome: ${tile.biome.name}`;
+      if (tile.feature) {
+        tooltipText += ` | Feature: ${tile.feature.name}`;
+      }
+
+      this.tooltipContainer.textContent = tooltipText;
+      this.tooltipContainer.style.display = 'block';
+
+      // Position the tooltip near the cursor. The offset (e.g., +15px) prevents the
+      // tooltip from flickering by being directly under the cursor, which would
+      // trigger a 'mouseleave' event on the canvas.
+      this.tooltipContainer.style.left = `${event.clientX + 15}px`;
+      this.tooltipContainer.style.top = `${event.clientY + 15}px`;
+    } else {
+      // If the tile or event is null, hide the tooltip.
+      this.tooltipContainer.style.display = 'none';
+    }
   }
 
   /**
