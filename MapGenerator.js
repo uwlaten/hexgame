@@ -9,6 +9,7 @@ import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
 import { FeatureLibrary } from './FeatureLibrary.js';
 import { ResourceLibrary } from './ResourceLibrary.js';
+import { Building } from './Building.js';
 import { createNoise2D } from 'https://cdn.skypack.dev/simplex-noise';
 
 /**
@@ -94,11 +95,11 @@ export default class MapGenerator {
     // 9. Generate rivers.
     this._generateRivers(map, log);
 
-    // NEW: Place resources on the map.
-    this._generateResources(map);
-
     // 10. Run final post-processing passes to clean up the map.
     this._runPostProcessingPasses(map, placeholderBiome);
+
+    // 11. Place resources on the now-finalized map.
+    this._generateResources(map, log);
 
     return log;
   }
@@ -1437,80 +1438,218 @@ export default class MapGenerator {
   }
 
   /**
-   * Places resources on the map based on biome and feature rules.
-   * This is the main orchestrator for the resource placement phase.
+   * Orchestrates the resource generation process using a "ranked candidate" model.
    * @param {import('./Map.js').default} map The map object to modify.
+   * @param {string[]} log The log array to push messages to.
    * @private
    */
-  static _generateResources(map) {
-    for (const tile of map.grid.flat()) {
-      // A tile can only have one piece of content. If it's already occupied, skip.
-      if (tile.contentType) continue;
+  static _generateResources(map, log) {
+    // 1. Determine how many of each resource to spawn.
+    const targetCounts = this._determineResourceTargetCounts();
+    log.push(`Target resource counts: ${JSON.stringify(targetCounts)}`);
 
-      let resourcePlaced = false;
-      // Start with the biome's potential resources. Make a copy to avoid mutation.
-      let biomeRules = tile.biome.possibleResources ? [...tile.biome.possibleResources] : [];
-
-      // --- Feature-First Precedence ---
-      if (tile.feature) {
-        // Check for a specific override for this biome-feature combination.
-        let featureRules = tile.feature.resourceOverrides?.[tile.biome.id]
-          // If no override, use the feature's default list.
-          || tile.feature.possibleResources
-          || [];
-
-        if (this._tryPlaceResource(tile, featureRules, map)) {
-          resourcePlaced = true;
-        }
-
-        // --- Biome Resource Interaction ---
-        const interaction = tile.feature.biomeResourceInteraction;
-        if (interaction) {
-          if (interaction.mode === 'block') {
-            if (interaction.resourceIds.includes('*')) {
-              // The '*' wildcard blocks all biome resources.
-              biomeRules = [];
-            } else {
-              // Filter out the specific resources listed in the block list.
-              const blockedIds = new Set(interaction.resourceIds);
-              biomeRules = biomeRules.filter(rule => !blockedIds.has(rule.resourceId));
-            }
-          }
-          // 'allow' mode could be implemented here if needed.
-        }
+    // 2. Create and shuffle the master list of all resource instances to place.
+    const masterPlacementList = [];
+    for (const [resourceId, count] of Object.entries(targetCounts)) {
+      for (let i = 0; i < count; i++) {
+        masterPlacementList.push(resourceId);
       }
+    }
+    this._shuffleArray(masterPlacementList);
 
-      // --- Biome Resource Placement ---
-      // If no resource was placed by a feature, and there are valid biome rules left...
-      if (!resourcePlaced && biomeRules.length > 0) {
-        this._tryPlaceResource(tile, biomeRules, map);
+    // 3. Loop through the shuffled list and place each instance.
+    const finalResourceCounts = {};
+    for (const resourceId of masterPlacementList) {
+      const candidateTiers = this._getRankedCandidateTiers(resourceId, map);
+      const placed = this._placeSingleResourceInstance(resourceId, candidateTiers, map);
+      if (placed) {
+        finalResourceCounts[resourceId] = (finalResourceCounts[resourceId] || 0) + 1;
       }
+    }
+
+    // --- Final Logging ---
+    const summary = Object.entries(finalResourceCounts)
+      .filter(([, count]) => count > 0)
+      .map(([name, count]) => `${name}: ${count}`)
+      .join(', ');
+
+    if (summary) {
+      log.push(`Final Resource Counts: ${summary}`);
+    } else {
+      log.push('No resources were placed on the map.');
     }
   }
 
   /**
-   * Attempts to place a resource on a tile based on a list of rules.
-   * It iterates through rules, checks conditions, and rolls for chance.
-   * @param {import('./HexTile.js').default} tile The tile to place a resource on.
-   * @param {Array<object>} rules The resource rules to process.
-   * @param {import('./Map.js').default} map The map object.
-   * @returns {boolean} True if a resource was successfully placed.
+   * Determines how many of each resource should be placed on the map.
+   * For now, it returns a random number between 1 and 3 for each resource type.
+   * @returns {Object.<string, number>} A map of resource IDs to their target counts.
    * @private
    */
-  static _tryPlaceResource(tile, rules, map) {
-    for (const rule of rules) {
-      if (this._checkConditions(tile, rule.conditions, map)) {
-        if (Math.random() < rule.chance) {
-          // Find the resource definition in the library using its ID.
-          const resourceDef = ResourceLibrary[rule.resourceId.toUpperCase()];
-          if (resourceDef) {
-            tile.setContent(resourceDef);
-            return true; // A resource was placed, so we stop processing rules for this tile.
+  static _determineResourceTargetCounts() {
+    const counts = {};
+    for (const key in ResourceLibrary) {
+      const resourceId = ResourceLibrary[key].id;
+      // For each resource, decide to spawn between 1 and 3 instances.
+      counts[resourceId] = Math.floor(Math.random() * 3) + 1;
+    }
+    return counts;
+  }
+
+  /**
+   * Shuffles an array in place using the Fisher-Yates algorithm.
+   * @param {Array} array The array to shuffle.
+   * @private
+   */
+  static _shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  /**
+   * Finds and ranks all possible spawn locations for a resource, grouping them into tiers.
+   * This uses the "Best Match Wins" principle, where the first valid rule for a resource on a tile is chosen.
+   * @param {string} resourceId The ID of the resource to find candidates for.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {object} An object containing tiered lists of candidate tiles.
+   * @private
+   */
+  static _getRankedCandidateTiers(resourceId, map) {
+    const candidates = [];
+
+    for (const tile of map.grid.flat()) {
+      // Get all rules that could apply to this tile.
+      const applicableRules = this._getApplicableRulesForTile(tile);
+      // Filter for rules matching the specific resource we're placing.
+      const resourceRules = applicableRules.filter(r => r.resourceId === resourceId);
+
+      // Find the single best rule for this resource on this tile.
+      // This relies on rules being ordered from most to least specific in the library files.
+      for (const rule of resourceRules) {
+        if (this._checkConditions(tile, rule.conditions, map)) {
+          // "Best Match Wins": we found the highest-priority valid rule.
+          const score = rule.chance;
+          candidates.push({ tile, score });
+          break; // Stop checking other rules for this resource on this tile.
+        }
+      }
+    }
+
+    // Group the collected candidates into tiers based on their score.
+    const tiers = { tier1: [], tier2: [], tier3: [] };
+    for (const candidate of candidates) {
+      if (candidate.score >= 0.4) {
+        tiers.tier1.push(candidate.tile);
+      } else if (candidate.score >= 0.1) {
+        tiers.tier2.push(candidate.tile);
+      } else {
+        tiers.tier3.push(candidate.tile);
+      }
+    }
+
+    return tiers;
+  }
+
+  /**
+   * Attempts to place a single resource instance using the "Tiered Lottery" method.
+   * @param {string} resourceId The ID of the resource to place.
+   * @param {object} candidateTiers The tiered list of potential spawn locations.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {boolean} True if the resource was successfully placed, false otherwise.
+   * @private
+   */
+  static _placeSingleResourceInstance(resourceId, candidateTiers, map) {
+    // Define the probabilities for selecting from each tier.
+    const tierProbabilities = {
+      tier1: 0.70, // 70% chance to pick from the best locations
+      tier2: 0.25, // 25% chance to pick from good locations
+      tier3: 0.05, // 5% chance to pick from acceptable locations
+    };
+
+    const rand = Math.random();
+    let chosenTierName;
+
+    if (rand < tierProbabilities.tier1) {
+      chosenTierName = 'tier1';
+    } else if (rand < tierProbabilities.tier1 + tierProbabilities.tier2) {
+      chosenTierName = 'tier2';
+    } else {
+      chosenTierName = 'tier3';
+    }
+
+    // Fallback logic: if a higher tier is empty, try the next one down.
+    const tierOrder = [chosenTierName, 'tier1', 'tier2', 'tier3'];
+    const uniqueTierOrder = [...new Set(tierOrder)]; // Ensures we don't check a tier twice
+
+    for (const tierName of uniqueTierOrder) {
+      const candidates = candidateTiers[tierName];
+      if (candidates && candidates.length > 0) {
+        // Shuffle the chosen tier to randomize placement among equally-good candidates.
+        this._shuffleArray(candidates);
+
+        for (const tile of candidates) {
+          // Final validation: ensure the tile is still empty and not adjacent to another resource.
+          if (!tile.contentType && !this._isAdjacentToResource(tile, map)) {
+            const resourceDef = ResourceLibrary[resourceId.toUpperCase()];
+            if (resourceDef) {
+              tile.setContent(resourceDef);
+              return true; // Successfully placed.
+            }
           }
         }
       }
     }
-    return false; // No resource was placed from this set of rules.
+
+    // If no valid placement was found in any tier, return false.
+    return false;
+  }
+
+  /**
+   * Gets all resource placement rules that apply to a given tile,
+   * respecting feature precedence and biome interactions.
+   * @returns {object[]} An array of applicable rule objects.
+   * @private
+   */
+  static _getApplicableRulesForTile(tile) {
+    const finalRules = [];
+    let biomeRules = tile.biome.possibleResources ? [...tile.biome.possibleResources] : [];
+
+    if (tile.feature) {
+      const featureRules = tile.feature.resourceOverrides?.[tile.biome.id]
+        || tile.feature.possibleResources
+        || [];
+      finalRules.push(...featureRules);
+
+      const interaction = tile.feature.biomeResourceInteraction;
+      if (interaction?.mode === 'block') {
+        if (interaction.resourceIds.includes('*')) {
+          biomeRules = [];
+        } else {
+          const blockedIds = new Set(interaction.resourceIds);
+          biomeRules = biomeRules.filter(rule => !blockedIds.has(rule.resourceId));
+        }
+      }
+    }
+
+    finalRules.push(...biomeRules);
+    return finalRules;
+  }
+
+  /**
+   * Checks if a tile is adjacent to another tile that already has a resource.
+   * @returns {boolean} True if an adjacent resource is found.
+   * @private
+   */
+  static _isAdjacentToResource(tile, map) {
+    const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+    for (const neighbor of neighbors) {
+      if (neighbor.contentType && !(neighbor.contentType instanceof Building)) {
+        return true; // It has content, and it's not a building, so it must be a resource.
+      }
+    }
+    return false;
   }
 
   /**

@@ -83,14 +83,14 @@ export const BiomeLibrary = {
     },
     canSupportFeatures: true,
     possibleResources: [
-      // A base chance for grain to appear anywhere in grasslands.
-      { resourceId: 'Grain', chance: 0.05 },
       // A much higher chance for grain on fertile tiles next to a river.
       {
         resourceId: 'Grain',
         chance: 0.4,
         conditions: [{ type: 'adjacentToRiver' }],
       },
+      // A base chance for grain to appear anywhere in grasslands.
+      { resourceId: 'Grain', chance: 0.05 },
     ],
   },
   SAVANNAH: {

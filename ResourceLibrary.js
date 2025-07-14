@@ -11,6 +11,7 @@ export const ResourceLibrary = {
       type: 'shapes',
       useSizeFactor: true,
       shapes: [
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', params: [0, 0, 0.45] },
         { type: 'polygon', fillStyle: '#5E6971', params: [ [-0.3, -0.1], [0.3, -0.1], [0.35, 0.1], [0.2, 0.3], [-0.2, 0.3], [-0.35, 0.1] ] },
       ],
     },
@@ -22,6 +23,7 @@ export const ResourceLibrary = {
       type: 'shapes',
       useSizeFactor: true,
       shapes: [
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', params: [0, 0, 0.45] },
         { type: 'polygon', fillStyle: '#4682B4', params: [ [-0.4, 0], [0, -0.2], [0.2, 0], [0, 0.2] ] },
         { type: 'polygon', fillStyle: '#4682B4', params: [ [0.2, 0], [0.4, -0.2], [0.4, 0.2] ] },
       ],
@@ -32,13 +34,23 @@ export const ResourceLibrary = {
     name: 'Grain',
     draw: {
       type: 'shapes',
-      strokeStyle: '#DAA520',
-      lineWidth: 2,
       useSizeFactor: true,
+      fillStyle: '#ce980fff', // A darker, more golden color for the wheat.
+      strokeStyle: '#ce980fff', // A dark brown for the outline.
+      lineWidth: 1.5, // A slightly thicker line.
       shapes: [
-        { type: 'arc', params: [-0.2, 0.4, 0.5, -Math.PI / 2, -Math.PI / 4] },
-        { type: 'arc', params: [0, 0.4, 0.5, -Math.PI / 2, -Math.PI / 3] },
-        { type: 'arc', params: [0.2, 0.4, 0.5, -Math.PI / 2, -Math.PI / 2.5] },
+        // Background plate (overrides the default styles for the wheat).
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', strokeStyle: 'transparent', params: [0, 0, 0.45] },
+        // A single, stylized stalk of wheat, which will use the default styles.
+        // Stem
+        { type: 'rect', params: [-0.04, 0.0, 0.08, 0.4] },
+        // Kernels (staggered on both sides)
+        { type: 'polygon', params: [ [-0.04, 0.05], [-0.15, -0.05], [-0.04, -0.15] ] },
+        { type: 'polygon', params: [ [0.04, 0.05], [0.15, -0.05], [0.04, -0.15] ] },
+        { type: 'polygon', params: [ [-0.04, -0.1], [-0.15, -0.2], [-0.04, -0.3] ] },
+        { type: 'polygon', params: [ [0.04, -0.1], [0.15, -0.2], [0.04, -0.3] ] },
+        // Top of the stalk
+        { type: 'polygon', params: [ [-0.04, -0.25], [0, -0.4], [0.04, -0.25] ] },
       ],
     },
   },
@@ -49,6 +61,7 @@ export const ResourceLibrary = {
       type: 'shapes',
       useSizeFactor: true,
       shapes: [
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', params: [0, 0, 0.45] },
         { type: 'rect', fillStyle: '#8B4513', params: [-0.4, -0.1, 0.8, 0.2] },
         { type: 'rect', fillStyle: '#A0522D', params: [-0.3, 0.1, 0.7, 0.2] },
       ],
@@ -61,6 +74,7 @@ export const ResourceLibrary = {
       type: 'shapes',
       useSizeFactor: true,
       shapes: [
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', params: [0, 0, 0.45] },
         { type: 'polygon', fillStyle: '#A9A9A9', params: [ [-0.3, -0.1], [0, -0.3], [0.2, 0], [-0.1, 0.2] ] },
         { type: 'polygon', fillStyle: '#808080', params: [ [0.1, 0.1], [0.4, 0.2], [0.2, 0.4] ] },
       ],

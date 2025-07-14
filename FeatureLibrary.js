@@ -40,6 +40,12 @@ export const FeatureLibrary = {
     possibleResources: [
       { resourceId: 'Wood', chance: 0.2 }, // Forests have a 20% chance to have a Wood resource.
     ],
+    // Override the default resources for specific biomes.
+    resourceOverrides: {
+      // When a forest is on these biomes, it produces no resources.
+      savannah: [],
+      desert: [],
+    },
     draw: {
       type: 'shapes',
       useSizeFactor: true,
