@@ -2,6 +2,8 @@
  * @fileoverview Defines the UIManager class for managing HTML UI elements.
  */
 
+import DrawingUtils from './DrawingUtils.js';
+import Config from './Config.js';
 import { BuildingLibrary } from './BuildingLibrary.js';
 
 /**
@@ -62,13 +64,14 @@ export default class UIManager {
     tempLabel.htmlFor = 'temperature-slider';
     tempLabel.textContent = 'Temp:';
 
+    const tempConfig = Config.UIConfig.generationSliderRanges.temperature;
     this.temperatureSlider = document.createElement('input');
     this.temperatureSlider.type = 'range';
     this.temperatureSlider.id = 'temperature-slider';
-    this.temperatureSlider.min = 0;
-    this.temperatureSlider.max = 2;
-    this.temperatureSlider.step = 1;
-    this.temperatureSlider.value = 1; // Default to Temperate
+    this.temperatureSlider.min = tempConfig.min;
+    this.temperatureSlider.max = tempConfig.max;
+    this.temperatureSlider.step = tempConfig.step;
+    this.temperatureSlider.value = tempConfig.value;
 
     this.temperatureOutput = document.createElement('output');
     this.temperatureOutput.htmlFor = 'temperature-slider';
@@ -89,12 +92,13 @@ export default class UIManager {
     waterLabel.htmlFor = 'water-slider';
     waterLabel.textContent = 'Water:';
 
+    const waterConfig = Config.UIConfig.generationSliderRanges.waterLevel;
     this.waterSlider = document.createElement('input');
     this.waterSlider.type = 'range';
     this.waterSlider.id = 'water-slider';
-    this.waterSlider.min = 20;
-    this.waterSlider.max = 70;
-    this.waterSlider.value = 40; // Default to 40%
+    this.waterSlider.min = waterConfig.min;
+    this.waterSlider.max = waterConfig.max;
+    this.waterSlider.value = waterConfig.value;
 
     this.waterOutput = document.createElement('output');
     this.waterOutput.htmlFor = 'water-slider';
@@ -164,9 +168,10 @@ export default class UIManager {
     this.nextTileLabel = document.createElement('span');
     this.nextTileLabel.textContent = 'Next Tile:';
 
+    const displayConfig = Config.UIConfig.nextTileDisplay;
     this.nextTileCanvas = document.createElement('canvas');
-    this.nextTileCanvas.width = 60;
-    this.nextTileCanvas.height = 60;
+    this.nextTileCanvas.width = displayConfig.width;
+    this.nextTileCanvas.height = displayConfig.height;
     this.nextTileCtx = this.nextTileCanvas.getContext('2d');
 
     container.appendChild(this.nextTileLabel);
@@ -221,17 +226,17 @@ export default class UIManager {
 
     if (!tileId) return;
 
-    const hexSize = 20;
+    const hexSize = Config.UIConfig.nextTileDisplay.hexSize;
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
 
-    this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Savannah color
+    // Draw a generic background tile for the icon.
+    this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Savannah color as a neutral background.
 
-    if (tileId === BuildingLibrary.RESIDENCE.id) {
-      ctx.fillStyle = '#8B4513'; // SaddleBrown
-      ctx.beginPath();
-      ctx.arc(cx, cy, hexSize * 0.5, 0, 2 * Math.PI);
-      ctx.fill();
+    // Find the building's definition in the library and use the new utility to draw it.
+    const buildingDefinition = Object.values(BuildingLibrary).find(b => b.id === tileId);
+    if (buildingDefinition?.draw) {
+      DrawingUtils.drawDetails(ctx, buildingDefinition, cx, cy, hexSize);
     }
   }
 

@@ -29,8 +29,6 @@ function main() {
     return;
   }
 
-  const hexSize = 15; // The radius of a hex tile in pixels.
-
   // --- 2. INITIALIZATION ---
   // The event emitter is the central hub for game events.
   const eventEmitter = new EventEmitter();
@@ -44,11 +42,18 @@ function main() {
 
   const gameMap = new Map();
   const initialOptions = uiManager.getGenerationOptions();
-  MapGenerator.generate(gameMap, initialOptions);
+  const generationLog = MapGenerator.generate(gameMap, initialOptions);
+
+  // Print the generation log to the console for debugging.
+  console.groupCollapsed('Initial Map Generation Log');
+  for (const message of generationLog) {
+    console.log(message);
+  }
+  console.groupEnd();
 
   // Create the renderer instance first. It is now the source of truth for
   // all layout and sizing calculations.
-  const renderer = new Renderer(canvas, hexSize);
+  const renderer = new Renderer(canvas, Config.RendererConfig.hexSize);
 
   // Ask the renderer for the required canvas size and apply it.
   // This decouples the main script from layout-specific calculations.

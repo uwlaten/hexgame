@@ -3,6 +3,7 @@
  * This decouples the map generation logic from the Map data structure itself.
  */
 
+import Config from './Config.js';
 import HexTile from './HexTile.js';
 import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
@@ -22,20 +23,22 @@ export default class MapGenerator {
    * @param {object} [options={}] The options for map generation.
    * @param {number} [options.waterLevel=40] The percentage of water on the map.
    * @param {string} [options.temperature='temperate'] The temperature setting ('cold', 'temperate', 'hot').
+   * @returns {string[]} An array of log messages generated during the process.
    */
   static generate(map, options = {}) {
     const { waterLevel = 40, temperature = 'temperate' } = options;
-    console.log(`Generating map with options:`, { waterLevel, temperature });
+    const log = [];
+    log.push(`Generating map with options: waterLevel=${waterLevel}, temperature=${temperature}`);
 
     const placeholderBiome = Object.values(BiomeLibrary).find(b => b.isDefaultPlaceholder);
     if (!placeholderBiome) {
       console.error('MapGenerator Error: No biome in BiomeLibrary is marked with isDefaultPlaceholder: true');
       // Stop generation if the placeholder is not defined to prevent further errors.
-      return;
+      return ['Error: No default placeholder biome found.'];
     }
 
     const noise2D = createNoise2D();
-    const noiseScale = 0.1; // Smaller values = more "zoomed in", larger continents.
+    const noiseScale = Config.MapGeneratorConfig.baseElevationNoiseScale;
 
     // 1. Generate a base elevation map using simplex noise.
     const elevationMap = [];
@@ -52,7 +55,7 @@ export default class MapGenerator {
     }
 
     // 2. Apply a gradient to the elevation map to form a central continent.
-    const finalElevationMap = this._applyEdgeControl(elevationMap, map.width, map.height);
+    const finalElevationMap = this._applyEdgeControl(elevationMap, map.width, map.height, log);
 
     // 3. Determine the sea level threshold based on the desired water percentage.
     const allElevations = finalElevationMap.flat().sort((a, b) => a - b);
@@ -76,10 +79,10 @@ export default class MapGenerator {
     }
 
     // 5. Place mountain ranges and peaks on the land.
-    this._generateMountains(map, finalElevationMap, placeholderBiome);
+    this._generateMountains(map, finalElevationMap, placeholderBiome, log);
 
     // 6. Determine climate and assign final biomes to land tiles.
-    const { moistureMap } = this._generateClimateAndBiomes(map, options, placeholderBiome);
+    const { moistureMap } = this._generateClimateAndBiomes(map, options, placeholderBiome, log);
 
     // 7. Add detail features like hills.
     this._generateHills(map, finalElevationMap);
@@ -88,10 +91,12 @@ export default class MapGenerator {
     this._generateForests(map, moistureMap);
 
     // 9. Generate rivers.
-    this._generateRivers(map);
+    this._generateRivers(map, log);
 
     // 10. Run final post-processing passes to clean up the map.
     this._runPostProcessingPasses(map, placeholderBiome);
+
+    return log;
   }
 
   /**
@@ -103,7 +108,7 @@ export default class MapGenerator {
    * @returns {number[][]} The modified elevation map.
    * @private
    */
-  static _applyEdgeControl(elevationMap, width, height) {
+  static _applyEdgeControl(elevationMap, width, height, log) {
     const modifiedMap = [];
     const numEdges = Math.random() < 0.5 ? 1 : 2; // 50% chance for 1 or 2 low edges
     const edges = ['top', 'bottom', 'left', 'right'];
@@ -114,7 +119,7 @@ export default class MapGenerator {
       [edges[i], edges[j]] = [edges[j], edges[i]];
     }
     const lowEdges = edges.slice(0, numEdges);
-    console.log('Lowering edges:', lowEdges);
+    log.push(`Lowering edges: ${lowEdges.join(', ')}`);
 
     const hasLow = (edge) => lowEdges.includes(edge);
 
@@ -158,29 +163,17 @@ export default class MapGenerator {
    * @param {import('./Map.js').default} map The map object to modify.
    * @param {number[][]} elevationMap The final elevation map, used to place lone peaks.
    * @param {object} placeholderBiome The biome object used as the default land tile.
+   * @param {string[]} log The log array to push messages to.
    * @private
    */
-  static _generateMountains(map, elevationMap, placeholderBiome) {
-    const mountainConfig = {
-      // The number of mountain ranges to generate.
-      numRanges: { min: 1, max: 3 },
-      // A weighted pool of possible lengths for each range. More entries for a number means it's more likely to be picked.
-      rangeLengths: [5, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 10, 11, 12],
-      // The probability (0-1) that a mountain range will start on an inland tile vs. a coastal one.
-      inlandStartChance: 0.9,
-      // The probability (0-1) that a segment of a range will create an adjacent "bulge", making the range thicker.
-      bulgeChance: 0.1,
-      // The percentage (0-1) of the highest-elevation plains tiles that will be converted into lone mountain peaks.
-      lonePeakPercentage: 0.01,
-      // The minimum number of land tiles required on the map to attempt mountain generation.
-      minLandTiles: 20,
-    };
+  static _generateMountains(map, elevationMap, placeholderBiome, log) {
+    const config = Config.MapGeneratorConfig.mountains;
 
     const allLandTiles = this._getLandTiles(map);
     // This set will track all mountains placed across all ranges to detect convergence.
     const allMountainCoords = new Set();
 
-    if (allLandTiles.length < mountainConfig.minLandTiles) return;
+    if (allLandTiles.length < config.minLandTiles) return;
 
     const coastalCoords = new Set();
     const inlandTiles = [];
@@ -204,12 +197,12 @@ export default class MapGenerator {
       }
     }
 
-    const numRanges = Math.floor(Math.random() * (mountainConfig.numRanges.max - mountainConfig.numRanges.min + 1)) + mountainConfig.numRanges.min;
+    const numRanges = Math.floor(Math.random() * (config.numRanges.max - config.numRanges.min + 1)) + config.numRanges.min;
 
     for (let i = 0; i < numRanges; i++) {
-      const targetLength = mountainConfig.rangeLengths[Math.floor(Math.random() * mountainConfig.rangeLengths.length)];
+      const targetLength = config.rangeLengths[Math.floor(Math.random() * config.rangeLengths.length)];
 
-      const startInland = Math.random() < mountainConfig.inlandStartChance;
+      const startInland = Math.random() < config.inlandStartChance;
       let startTilePool = (startInland && inlandTiles.length > 0) ? inlandTiles : coastalTiles;
       if (startTilePool.length === 0) startTilePool = inlandTiles.length > 0 ? inlandTiles : coastalTiles;
       if (startTilePool.length === 0) continue; // No valid start tiles
@@ -240,7 +233,7 @@ export default class MapGenerator {
         }
 
         // Create a "bulge" in the mountain range.
-        if (Math.random() < mountainConfig.bulgeChance) {
+        if (Math.random() < config.bulgeChance) {
           const neighbors = HexGridUtils.getNeighbors(currentTile.x, currentTile.y);
           const randomNeighborCoords = neighbors[Math.floor(Math.random() * neighbors.length)];
           const bulgeTile = map.getTileAt(randomNeighborCoords.x, randomNeighborCoords.y);
@@ -329,7 +322,7 @@ export default class MapGenerator {
     // We will iterate through the candidates and place peaks until we reach our target,
     // skipping any invalid placements.
     plainsWithElevation.sort((a, b) => b.elevation - a.elevation);
-    const numPeaksToPlace = Math.ceil(plainsWithElevation.length * mountainConfig.lonePeakPercentage);
+    const numPeaksToPlace = Math.ceil(plainsWithElevation.length * config.lonePeakPercentage);
     let peaksPlaced = 0;
 
     for (const candidate of plainsWithElevation) {
@@ -396,17 +389,8 @@ export default class MapGenerator {
    * @param {object} placeholderBiome The biome object used as the default land tile.
    * @private
    */
-  static _generateClimateAndBiomes(map, options, placeholderBiome) {
-    const climateConfig = { // This could be moved to a higher-level config if needed.
-      coastalModeration: 0.2, // How much warmer/cooler coasts are (0-1).
-      moderationBlurPasses: 3, // How many tiles inland the coastal effect bleeds.
-      moistureNoiseScale: 0.08, // Zoom level for base moisture noise.
-      rainShadowStrength: 0.5, // How much moisture is reduced behind mountains (0-1).
-      rainShadowDistance: 10, // How far downwind the rain shadow effect reaches.
-      biomeNoiseScale: 0.15, // Zoom level for the biome tie-breaker noise.
-      iceMaxRow: 3, // The max row (from top) where ice can form.
-      iceTempThreshold: 0.05, // The max temperature (0-1) for ice to form.
-    };
+  static _generateClimateAndBiomes(map, options, placeholderBiome, log) {
+    const config = Config.MapGeneratorConfig.climate;
 
     // --- 1. Generate Base Temperature Map (Top-to-bottom gradient) ---
     const baseTemperatureMap = [];
@@ -430,13 +414,13 @@ export default class MapGenerator {
         if (isCoastal) {
           // Positive value warms the north, negative value cools the south.
           const baseTemp = baseTemperatureMap[y][x];
-          moderationMap[y][x] = climateConfig.coastalModeration * (0.5 - baseTemp) * 2;
+          moderationMap[y][x] = config.coastalModeration * (0.5 - baseTemp) * 2;
         }
       }
     }
 
     // --- 3. Blur/Diffuse the Moderation Map to bleed the effect inland ---
-    for (let pass = 0; pass < climateConfig.moderationBlurPasses; pass++) {
+    for (let pass = 0; pass < config.moderationBlurPasses; pass++) {
       const nextModerationMap = Array.from({ length: map.height }, () => Array(map.width).fill(0));
       for (let y = 0; y < map.height; y++) {
         for (let x = 0; x < map.width; x++) {
@@ -475,14 +459,14 @@ export default class MapGenerator {
     for (let y = 0; y < map.height; y++) {
       const row = [];
       for (let x = 0; x < map.width; x++) {
-        const noiseValue = moistureNoise2D(x * climateConfig.moistureNoiseScale, y * climateConfig.moistureNoiseScale);
+        const noiseValue = moistureNoise2D(x * config.moistureNoiseScale, y * config.moistureNoiseScale);
         row.push((noiseValue + 1) / 2); // Normalize to 0-1
       }
       moistureMap.push(row);
     }
 
     // --- 6. Apply Rain Shadow based on a global wind vector ---
-    const windVector = this._getWindVector(map);
+    const windVector = this._getWindVector(map, log);
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         if (map.getTileAt(x, y).biome.id === BiomeLibrary.OCEAN.id) continue;
@@ -490,7 +474,7 @@ export default class MapGenerator {
         // Trace a line against the wind to see if we hit a mountain
         let currentX = x;
         let currentY = y;
-        for (let i = 0; i < climateConfig.rainShadowDistance; i++) {
+        for (let i = 0; i < config.rainShadowDistance; i++) {
           // Move against the wind
           currentX -= windVector.dx;
           currentY -= windVector.dy;
@@ -501,8 +485,8 @@ export default class MapGenerator {
           const tile = map.getTileAt(roundedX, roundedY);
           if (tile && tile.biome.id === BiomeLibrary.MOUNTAIN.id) {
             // We are in a rain shadow. Reduce moisture.
-            const shadowFactor = 1.0 - (i / climateConfig.rainShadowDistance); // Fades with distance
-            const moistureReduction = climateConfig.rainShadowStrength * shadowFactor;
+            const shadowFactor = 1.0 - (i / config.rainShadowDistance); // Fades with distance
+            const moistureReduction = config.rainShadowStrength * shadowFactor;
             moistureMap[y][x] = Math.max(0, moistureMap[y][x] - moistureReduction);
             break; // Stop tracing once a mountain is found
           }
@@ -516,7 +500,7 @@ export default class MapGenerator {
     for (let y = 0; y < map.height; y++) {
       const row = [];
       for (let x = 0; x < map.width; x++) {
-        const noiseValue = biomeNoise2D(x * climateConfig.biomeNoiseScale, y * climateConfig.biomeNoiseScale);
+        const noiseValue = biomeNoise2D(x * config.biomeNoiseScale, y * config.biomeNoiseScale);
         row.push((noiseValue + 1) / 2); // Normalize to 0-1
       }
       biomeNoiseMap.push(row);
@@ -557,10 +541,10 @@ export default class MapGenerator {
     }
 
     // --- 9. Final Ice Pass ---
-    for (let y = 0; y < climateConfig.iceMaxRow; y++) {
+    for (let y = 0; y < config.iceMaxRow; y++) {
       for (let x = 0; x < map.width; x++) {
         const tile = map.getTileAt(x, y);
-        if (tile.biome.id === BiomeLibrary.OCEAN.id && finalTemperatureMap[y][x] < climateConfig.iceTempThreshold) {
+        if (tile.biome.id === BiomeLibrary.OCEAN.id && finalTemperatureMap[y][x] < config.iceTempThreshold) {
           tile.biome = BiomeLibrary.ICE;
         }
       }
@@ -647,6 +631,9 @@ export default class MapGenerator {
 
     // Pass 4: Clean up any features that might be on new lake tiles.
     this._removeFeaturesFromLakes(map);
+
+    // Pass 5: Final sanity check to remove any lakes with rivers on their edges.
+    this._cleanupInvalidLakes(map, placeholderBiome);
   }
 
   /**
@@ -656,17 +643,7 @@ export default class MapGenerator {
    * @private
    */
   static _generateForests(map, moistureMap) {
-    const forestsConfig = {
-      // Base chance is the moisture level. These are multipliers.
-      biomeMultipliers: {
-        tundra: 1,
-        savannah: 0.4,
-        grassland: 0.5,
-        desert: 0.1,
-      },
-      // A significant boost for desert tiles next to water to create oases.
-      oasisMoistureBoost: 0.5,
-    };
+    const config = Config.MapGeneratorConfig.forests;
 
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
@@ -681,8 +658,8 @@ export default class MapGenerator {
         const biomeId = tile.biome.id;
 
         // Apply biome-specific multipliers.
-        if (forestsConfig.biomeMultipliers[biomeId]) {
-          chance *= forestsConfig.biomeMultipliers[biomeId];
+        if (config.biomeMultipliers[biomeId]) {
+          chance *= config.biomeMultipliers[biomeId];
         }
 
         // Check for the "oasis" rule on desert tiles.
@@ -692,7 +669,7 @@ export default class MapGenerator {
             return neighbor && (neighbor.biome.id === BiomeLibrary.OCEAN.id || neighbor.biome.id === BiomeLibrary.LAKE.id);
           });
           if (isAdjacentToWater) {
-            chance += forestsConfig.oasisMoistureBoost;
+            chance += config.oasisMoistureBoost;
           }
         }
 
@@ -710,16 +687,7 @@ export default class MapGenerator {
    * @private
    */
   static _generateHills(map, elevationMap) {
-    const hillsConfig = {
-      // The base chance (0-1) for a tile directly adjacent to a mountain to become a hill.
-      adjacentToMountainChance: 0.6,
-      // How much the chance is reduced for each tile of distance away from a mountain.
-      distanceFalloff: 0.2,
-      // The minimum elevation (0-1) for a tile to be considered for isolated hills.
-      isolatedHillElevationThreshold: 0.6,
-      // The chance (0-1) for a valid high-elevation tile to become an isolated hill.
-      isolatedHillChance: 0.05,
-    };
+    const config = Config.MapGeneratorConfig.hills;
 
     // --- Proximity-Based Hills (Foothills) ---
     const queue = [];
@@ -746,7 +714,7 @@ export default class MapGenerator {
     while (head < queue.length) {
       const { tile, distance } = queue[head++]; // Efficiently process the queue.
 
-      const chance = hillsConfig.adjacentToMountainChance - (distance - 1) * hillsConfig.distanceFalloff;
+      const chance = config.adjacentToMountainChance - (distance - 1) * config.distanceFalloff;
 
       if (Math.random() < chance) {
         tile.feature = FeatureLibrary.HILLS;
@@ -769,11 +737,11 @@ export default class MapGenerator {
       // Skip if the tile cannot support features or already has one.
       if (!tile.biome.canSupportFeatures || tile.feature) continue;
 
-      if (elevationMap[tile.y][tile.x] < hillsConfig.isolatedHillElevationThreshold) continue;
+      if (elevationMap[tile.y][tile.x] < config.isolatedHillElevationThreshold) continue;
 
       // Ensure it's not adjacent to a mountain to keep it truly isolated.
       const isAdjacentToMountain = HexGridUtils.getNeighbors(tile.x, tile.y).some(c => map.getTileAt(c.x, c.y)?.biome.id === BiomeLibrary.MOUNTAIN.id);
-      if (!isAdjacentToMountain && Math.random() < hillsConfig.isolatedHillChance) {
+      if (!isAdjacentToMountain && Math.random() < config.isolatedHillChance) {
         tile.feature = FeatureLibrary.HILLS;
       }
     }
@@ -785,7 +753,7 @@ export default class MapGenerator {
    * @returns {{dx: number, dy: number}} A vector representing the wind direction.
    * @private
    */
-  static _getWindVector(map) {
+  static _getWindVector(map, log) {
     const edgeCounts = { top: 0, bottom: 0, left: 0, right: 0 };
 
     for (let x = 0; x < map.width; x++) {
@@ -799,7 +767,7 @@ export default class MapGenerator {
 
     const sortedEdges = Object.entries(edgeCounts).sort((a, b) => b[1] - a[1]);
     const wettestEdge = sortedEdges[0][0];
-    console.log(`Prevailing wind from: ${wettestEdge}`);
+    log.push(`Prevailing wind from: ${wettestEdge}`);
 
     switch (wettestEdge) {
       case 'top': return { dx: 0, dy: 1 };
@@ -927,30 +895,22 @@ export default class MapGenerator {
   /**
    * The main method for the Hydrology Phase. Generates rivers on the map.
    * @param {import('./Map.js').default} map The map object to modify.
+   * @param {string[]} log The log array to push messages to.
    * @private
    */
-  static _generateRivers(map) {
-    const riverConfig = {
-      numRivers: { min: 2, max: 4 },
-      sourceWeights: {
-        [BiomeLibrary.MOUNTAIN.id]: 2, // Mountains are a likely source.
-        [BiomeLibrary.ICE.id]: 0,      // Glaciers are a potential future source
-        [FeatureLibrary.HILLS.id]: 1,
-      },
-      minLength: 7, // A river must have at least this many segments.
-      maxAttemptsPerRiver: 10, // Prevents infinite loops if no good sources are left.
-    };
+  static _generateRivers(map, log) {
+    const config = Config.MapGeneratorConfig.rivers;
 
     // 1. Identify all potential source tiles on the map.
     const potentialSources = [];
     for (const tile of this._getLandTiles(map)) {
       let weight = 0;
       if (tile.biome.id === BiomeLibrary.MOUNTAIN.id) {
-        weight = riverConfig.sourceWeights[BiomeLibrary.MOUNTAIN.id];
+        weight = config.sourceWeights.mountain;
       } else if (tile.biome.id === BiomeLibrary.ICE.id) {
-        weight = riverConfig.sourceWeights[BiomeLibrary.ICE.id];
+        weight = config.sourceWeights.ice;
       } else if (tile.feature?.id === FeatureLibrary.HILLS.id) {
-        weight = riverConfig.sourceWeights[FeatureLibrary.HILLS.id];
+        weight = config.sourceWeights.hills;
       }
 
       if (weight > 0) {
@@ -961,13 +921,13 @@ export default class MapGenerator {
     if (potentialSources.length === 0) return;
 
     // 2. Determine how many rivers to generate.
-    const numRiversToGenerate = Math.floor(Math.random() * (riverConfig.numRivers.max - riverConfig.numRivers.min + 1)) + riverConfig.numRivers.min;
-    console.log(`--- Attempting to generate ${numRiversToGenerate} Rivers ---`);
+    const numRiversToGenerate = Math.floor(Math.random() * (config.numRivers.max - config.numRivers.min + 1)) + config.numRivers.min;
+    log.push(`--- Attempting to generate ${numRiversToGenerate} Rivers ---`);
 
     let riversGenerated = 0;
     while (riversGenerated < numRiversToGenerate && potentialSources.length > 0) {
       let riverIsValid = false;
-      for (let attempt = 0; attempt < riverConfig.maxAttemptsPerRiver; attempt++) {
+      for (let attempt = 0; attempt < config.maxAttemptsPerRiver; attempt++) {
         if (potentialSources.length === 0) break; // No more sources to try
 
         const sourceChoice = this._getWeightedRandomChoice(potentialSources);
@@ -983,7 +943,7 @@ export default class MapGenerator {
         }
 
         const startVertex = vertices[Math.floor(Math.random() * vertices.length)];
-        const { path: riverPath, endVertex } = this._createRiverPath(startVertex, map, map.rivers);
+        const { path: riverPath, endVertex } = this._findRiverPathFromSource(startVertex, map, map.rivers);
 
         // --- New Validation: Check if the river ends too close to its source ---
         let endsTooClose = false;
@@ -1002,8 +962,8 @@ export default class MapGenerator {
           }
         }
 
-        if (riverPath.length >= riverConfig.minLength && !endsTooClose) {
-          console.log(`River from (${sourceTile.x}, ${sourceTile.y}) is valid with length ${riverPath.length}.`);
+        if (riverPath.length >= config.minLength && !endsTooClose) {
+          log.push(`River from (${sourceTile.x}, ${sourceTile.y}) is valid with length ${riverPath.length}.`);
           for (const edgeId of riverPath) {
             map.rivers.add(edgeId);
           }
@@ -1078,170 +1038,236 @@ export default class MapGenerator {
   }
 
   /**
-   * Creates a single river path starting from a given vertex.
+   * Entry point for creating a single river path. It sets up the initial state
+   * and calls the recursive exploration method.
    * @param {string} startVertex The ID of the vertex where the river begins.
    * @param {import('./Map.js').default} map The map object.
    * @param {Set<string>} existingRivers A set of edge IDs for already generated rivers.
-   * @returns {string[]} An array of edge IDs representing the river's path.
+   * @returns {{path: string[], endVertex: string}} The generated path and its final vertex.
    * @private
    */
-  static _createRiverPath(startVertex, map, existingRivers) {
-    const riverPath = [];
-    const visitedVertices = new Set();
-    const riverEdgeCountsByTile = new Map(); // Key: 'x,y', Value: count
-    let previousVertex = null;
-    let currentVertex = startVertex;
-    visitedVertices.add(currentVertex);
+  static _findRiverPathFromSource(startVertex, map, existingRivers) {
+    const visitedVertices = new Set([startVertex]);
+    const riverEdgeCountsByTile = new Map();
+    const maxDepth = Config.MapGeneratorConfig.rivers.maxDepth;
 
-    for (let i = 0; i < 100; i++) { // Max length to prevent infinite loops
-      const currentElevation = this._getVertexElevation(currentVertex, map);
+    const result = this._exploreRiverPath(startVertex, null, visitedVertices, riverEdgeCountsByTile, map, existingRivers, maxDepth);
 
-      // Check for termination: has the river reached the ocean?
-      const surroundingTiles = HexGridUtils.getTilesForVertex(currentVertex).map(c => map.getTileAt(c.x, c.y));
-      if (surroundingTiles.some(t => t?.biome.id === BiomeLibrary.OCEAN.id)) {
-        break;
-      }
+    return { path: result.path || [], endVertex: result.endVertex || startVertex };
+  }
 
-      // Find valid, unvisited neighbor vertices
-      const neighborVertices = this._getNeighborVertices(currentVertex, map);
-      const candidates = [];
+  /**
+   * Recursively explores paths for a river using backtracking.
+   * @returns {{success: boolean, path: string[], endVertex: string}}
+   * @private
+   */
+  static _exploreRiverPath(currentVertex, previousVertex, visitedVertices, riverEdgeCountsByTile, map, existingRivers, depth) {
+    if (depth <= 0) return { success: false }; // Reached max recursion depth
 
-      // --- U-Turn Heuristic: Get incoming vector ---
-      let incomingVector = null;
-      if (previousVertex) {
-        const prevCenter = HexGridUtils.getVertexCenterCube(previousVertex, map);
-        const currentCenter = HexGridUtils.getVertexCenterCube(currentVertex, map);
-        if (prevCenter && currentCenter) {
-          incomingVector = {
-            q: currentCenter.q - prevCenter.q,
-            r: currentCenter.r - prevCenter.r,
-          };
-        }
-      }
-
-      for (const neighbor of neighborVertices) {
-        if (!visitedVertices.has(neighbor)) {
-          const neighborElevation = this._getVertexElevation(neighbor, map);
-          // Allow flow to downhill or equal-elevation vertices.
-          if (neighborElevation <= currentElevation) {
-            // Weight is higher for a steeper drop, with a base for flat paths.
-            const elevationDrop = currentElevation - neighborElevation;
-            let weight = 1.0 + elevationDrop * 10.0;
-
-            // --- NEW: Hex-wrapping penalty ---
-            const tempEdgeId = HexGridUtils.getEdgeId(currentVertex, neighbor);
-            const borderedTiles = this._getTilesForEdge(tempEdgeId, map);
-            for (const tile of borderedTiles) {
-              const tileId = `${tile.x},${tile.y}`;
-              const currentCount = riverEdgeCountsByTile.get(tileId) || 0;
-              // If adding this edge makes it the 5th (or more) edge on this tile for this river
-              if (currentCount + 1 >= 5) {
-                weight *= 0.01; // Heavily penalize wrapping around a hex
-              }
-            }
-
-            // --- U-Turn Heuristic: Apply penalty ---
-            if (incomingVector) {
-              const currentCenter = HexGridUtils.getVertexCenterCube(currentVertex, map);
-              const neighborCenter = HexGridUtils.getVertexCenterCube(neighbor, map);
-              if (currentCenter && neighborCenter) {
-                const outgoingVector = { q: neighborCenter.q - currentCenter.q, r: neighborCenter.r - currentCenter.r };
-                const dotProduct = incomingVector.q * outgoingVector.q + incomingVector.r * outgoingVector.r;
-                if (dotProduct < 0) weight *= 0.1; // Penalize sharp turns
-              }
-            }
-            candidates.push({ vertex: neighbor, weight: weight });
-          }
-        }
-      }
-
-      if (candidates.length === 0) {
-        // --- Lake Formation Logic ---
-        // If the river is stuck and has moved at least one step, try to form a lake.
-        if (previousVertex) {
-          const currentTileCoords = HexGridUtils.getTilesForVertex(currentVertex);
-          const previousTileSet = new Set(HexGridUtils.getTilesForVertex(previousVertex).map(c => `${c.x},${c.y}`));
-
-          // The "forward" tile is the one in the current vertex that wasn't in the previous one.
-          const forwardTileCoord = currentTileCoords.find(c => !previousTileSet.has(`${c.x},${c.y}`));
-
-          if (forwardTileCoord) {
-            const forwardTile = map.getTileAt(forwardTileCoord.x, forwardTileCoord.y);
-            // Check if the target tile is a valid type to be flooded.
-            const canFlood = forwardTile &&
-                             forwardTile.biome.id !== BiomeLibrary.MOUNTAIN.id &&
-                             forwardTile.biome.id !== BiomeLibrary.ICE.id &&
-                             forwardTile.biome.id !== BiomeLibrary.OCEAN.id &&
-                             forwardTile.biome.id !== BiomeLibrary.LAKE.id;
-
-            if (canFlood) {
-              forwardTile.biome = BiomeLibrary.LAKE;
-            }
-          }
-        }
-        break; // River terminates, either by forming a lake or getting stuck.
-      }
-
-      // Find the next vertex using a weighted random choice.
-      const choice = this._getWeightedRandomChoice(candidates);
-      if (!choice) {
-        // This should not happen if candidates.length > 0, but as a safeguard:
-        break;
-      }
-      const nextVertex = choice.vertex;
-
-      const edgeId = HexGridUtils.getEdgeId(currentVertex, nextVertex);
-
-      // --- Termination Check 1: Merge with existing river ---
-      if (existingRivers.has(edgeId)) {
-        break;
-      }
-
-      // --- Termination Check 2: Lake Interaction ---
-      const nextSurroundingTiles = HexGridUtils.getTilesForVertex(nextVertex).map(c => map.getTileAt(c.x, c.y));
-      const lakeTile = nextSurroundingTiles.find(t => t?.biome.id === BiomeLibrary.LAKE.id);
-
-      if (lakeTile) {
-        const desertNeighbors = HexGridUtils.getNeighbors(lakeTile.x, lakeTile.y)
-          .map(c => map.getTileAt(c.x, c.y))
-          .filter(t => t?.biome.id === BiomeLibrary.DESERT.id).length;
-
-        // Rule: If a river enters a lake with 4+ desert neighbors, it terminates.
-        if (desertNeighbors >= 4) {
-          riverPath.push(edgeId); // Add final segment into the lake
-          break;
-        }
-
-        // --- Flow-Through Logic ---
-        riverPath.push(edgeId); // Add segment flowing into the lake.
-        const entryVertex = nextVertex;
-        const exitVertex = this._findOppositeVertex(entryVertex, lakeTile, map);
-
-        if (exitVertex && !visitedVertices.has(exitVertex)) {
-          previousVertex = entryVertex;
-          currentVertex = exitVertex;
-          visitedVertices.add(currentVertex);
-          continue; // Jump across the lake and continue pathfinding.
-        }
-      }
-
-      // If we've reached this point, the edge is valid and will be added to the path.
-      // Update the edge counts for the tiles this new segment borders.
-      const finalBorderedTiles = this._getTilesForEdge(edgeId, map);
-      for (const tile of finalBorderedTiles) {
-        const tileId = `${tile.x},${tile.y}`;
-        const currentCount = riverEdgeCountsByTile.get(tileId) || 0;
-        riverEdgeCountsByTile.set(tileId, currentCount + 1);
-      }
-
-      // Add the edge to our path and update state for the next iteration.
-      riverPath.push(edgeId);
-      previousVertex = currentVertex;
-      visitedVertices.add(nextVertex);
-      currentVertex = nextVertex;
+    // --- Base Case: Successful Termination ---
+    const surroundingTiles = HexGridUtils.getTilesForVertex(currentVertex).map(c => map.getTileAt(c.x, c.y));
+    if (surroundingTiles.some(t => t?.biome.id === BiomeLibrary.OCEAN.id)) {
+      return { success: true, path: [], endVertex: currentVertex };
     }
 
-    return { path: riverPath, endVertex: currentVertex };
+    // --- Candidate Selection ---
+    const candidates = this._getWeightedNeighborCandidates(currentVertex, previousVertex, visitedVertices, riverEdgeCountsByTile, map);
+    if (candidates.length === 0) {
+      // This vertex is a dead end from this direction, try to form a lake.
+      return this._attemptLakeFormation(currentVertex, previousVertex, map);
+    }
+
+    // --- Recursive Backtracking ---
+    for (const choice of candidates) {
+      const nextVertex = choice.vertex;
+      const edgeId = HexGridUtils.getEdgeId(currentVertex, nextVertex);
+
+      // Check for termination by merging or entering a lake
+      if (existingRivers.has(edgeId)) continue; // This path is blocked by another river.
+
+      const lakeInteractionResult = this._handleLakeInteraction(edgeId, nextVertex, visitedVertices, map);
+      if (lakeInteractionResult) {
+        if (lakeInteractionResult.shouldTerminate) {
+          return { success: true, path: [edgeId], endVertex: nextVertex };
+        }
+        if (lakeInteractionResult.shouldContinueFrom) {
+          const pathSegment = [edgeId];
+          visitedVertices.add(lakeInteractionResult.shouldContinueFrom);
+          const subResult = this._exploreRiverPath(lakeInteractionResult.shouldContinueFrom, nextVertex, visitedVertices, riverEdgeCountsByTile, map, existingRivers, depth - 1);
+          if (subResult.success) {
+            return { success: true, path: pathSegment.concat(subResult.path), endVertex: subResult.endVertex };
+          }
+          // Backtrack: if the path after the lake fails, we can't use this lake crossing.
+          visitedVertices.delete(lakeInteractionResult.shouldContinueFrom);
+          continue; // Try the next candidate instead of this lake path.
+        }
+      }
+
+      // Explore the path
+      visitedVertices.add(nextVertex);
+      this._updateEdgeCounts(edgeId, riverEdgeCountsByTile, map, 1);
+      const result = this._exploreRiverPath(nextVertex, currentVertex, visitedVertices, riverEdgeCountsByTile, map, existingRivers, depth - 1);
+
+      if (result.success) {
+        // Path was successful, prepend our edge and pass it up.
+        result.path.unshift(edgeId);
+        return result;
+      } else {
+        // Path failed, backtrack.
+        visitedVertices.delete(nextVertex);
+        this._updateEdgeCounts(edgeId, riverEdgeCountsByTile, map, -1);
+      }
+    }
+
+    // All candidates from this vertex led to dead ends. Try to form a lake as a last resort.
+    return this._attemptLakeFormation(currentVertex, previousVertex, map);
+  }
+
+  /**
+   * Gathers and weights all valid neighbor vertices for the river to flow to.
+   * @private
+   */
+  static _getWeightedNeighborCandidates(currentVertex, previousVertex, visitedVertices, riverEdgeCountsByTile, map) {
+    const candidates = [];
+    const currentElevation = this._getVertexElevation(currentVertex, map);
+    const neighborVertices = this._getNeighborVertices(currentVertex, map);
+
+    // --- U-Turn Heuristic: Get incoming vector ---
+    let incomingVector = null;
+    if (previousVertex) {
+      const prevCenter = HexGridUtils.getVertexCenterCube(previousVertex, map);
+      const currentCenter = HexGridUtils.getVertexCenterCube(currentVertex, map);
+      if (prevCenter && currentCenter) {
+        incomingVector = { q: currentCenter.q - prevCenter.q, r: currentCenter.r - prevCenter.r };
+      }
+    }
+
+    for (const neighbor of neighborVertices) {
+      if (visitedVertices.has(neighbor)) continue;
+
+      const neighborElevation = this._getVertexElevation(neighbor, map);
+      if (neighborElevation > currentElevation) continue; // Must be downhill or flat
+
+      const elevationDrop = currentElevation - neighborElevation;
+      let weight = 1.0 + elevationDrop * 10.0;
+
+      // --- Hex-wrapping penalty ---
+      const tempEdgeId = HexGridUtils.getEdgeId(currentVertex, neighbor);
+      const borderedTiles = this._getTilesForEdge(tempEdgeId, map);
+
+      // --- Refined Lake Interaction Heuristic ---
+      const isNextEdgeOnShore = borderedTiles.some(t => t?.biome.id === BiomeLibrary.LAKE.id);
+      if (isNextEdgeOnShore) {
+        const currentVertexTiles = HexGridUtils.getTilesForVertex(currentVertex).map(c => map.getTileAt(c.x, c.y));
+        const isCurrentVertexOnShore = currentVertexTiles.some(t => t?.biome.id === BiomeLibrary.LAKE.id);
+
+        if (isCurrentVertexOnShore) {
+          // This move continues along the shore of a lake we're already next to. Forbid it.
+          continue;
+        } else {
+          // This move is entering the lake's area for the first time. Encourage it.
+          weight *= 5.0;
+        }
+      }
+      for (const tile of borderedTiles) {
+        const tileId = `${tile.x},${tile.y}`;
+        const currentCount = riverEdgeCountsByTile.get(tileId) || 0;
+        if (currentCount + 1 >= 5) {
+          weight *= 0.01; // Heavily penalize wrapping
+        }
+      }
+
+      // --- U-Turn Heuristic: Apply penalty ---
+      if (incomingVector) {
+        const currentCenter = HexGridUtils.getVertexCenterCube(currentVertex, map);
+        const neighborCenter = HexGridUtils.getVertexCenterCube(neighbor, map);
+        if (currentCenter && neighborCenter) {
+          const outgoingVector = { q: neighborCenter.q - currentCenter.q, r: neighborCenter.r - currentCenter.r };
+          const dotProduct = incomingVector.q * outgoingVector.q + incomingVector.r * outgoingVector.r;
+          if (dotProduct < 0) weight *= 0.1; // Penalize sharp turns
+        }
+      }
+      candidates.push({ vertex: neighbor, weight: weight });
+    }
+
+    // Sort candidates by weight to try the best paths first in the recursive search.
+    candidates.sort((a, b) => b.weight - a.weight);
+    return candidates;
+  }
+
+  /**
+   * Attempts to form a lake when a river path is stuck.
+   * @returns {{success: boolean, path: string[], endVertex: string}|{success: boolean}}
+   * @private
+   */
+  static _attemptLakeFormation(currentVertex, previousVertex, map) {
+    if (!previousVertex) return { success: false }; // Cannot form a lake at the source.
+
+    const currentTileCoords = HexGridUtils.getTilesForVertex(currentVertex);
+    const previousTileSet = new Set(HexGridUtils.getTilesForVertex(previousVertex).map(c => `${c.x},${c.y}`));
+    const forwardTileCoord = currentTileCoords.find(c => !previousTileSet.has(`${c.x},${c.y}`));
+
+    if (forwardTileCoord) {
+      const forwardTile = map.getTileAt(forwardTileCoord.x, forwardTileCoord.y);
+      const canFlood = forwardTile &&
+                       forwardTile.biome.id !== BiomeLibrary.MOUNTAIN.id &&
+                       forwardTile.biome.id !== BiomeLibrary.ICE.id &&
+                       forwardTile.biome.id !== BiomeLibrary.OCEAN.id &&
+                       forwardTile.biome.id !== BiomeLibrary.LAKE.id;
+
+      if (canFlood) {
+        forwardTile.biome = BiomeLibrary.LAKE;
+        // A successfully formed lake is a valid termination point for a river.
+        return { success: true, path: [], endVertex: currentVertex };
+      }
+    }
+    // If no lake can be formed, this path is a failure.
+    return { success: false };
+  }
+
+  /**
+   * Handles the logic for a river flowing into an existing lake.
+   * @returns {{shouldTerminate: boolean}|{shouldContinueFrom: string}|null}
+   * @private
+   */
+  static _handleLakeInteraction(edgeId, nextVertex, visitedVertices, map) {
+    const nextSurroundingTiles = HexGridUtils.getTilesForVertex(nextVertex).map(c => map.getTileAt(c.x, c.y));
+    const lakeTile = nextSurroundingTiles.find(t => t?.biome.id === BiomeLibrary.LAKE.id);
+
+    if (!lakeTile) return null; // Not a lake interaction.
+
+    const desertNeighbors = HexGridUtils.getNeighbors(lakeTile.x, lakeTile.y)
+      .map(c => map.getTileAt(c.x, c.y))
+      .filter(t => t?.biome.id === BiomeLibrary.DESERT.id).length;
+
+    // Rule: If a river enters a lake with 4+ desert neighbors, it terminates.
+    if (desertNeighbors >= 4) {
+      return { shouldTerminate: true };
+    }
+
+    // --- Flow-Through Logic ---
+    const entryVertex = nextVertex;
+    const exitVertex = this._findOppositeVertex(entryVertex, lakeTile, map);
+
+    if (exitVertex && !visitedVertices.has(exitVertex)) {
+      return { shouldContinueFrom: exitVertex };
+    }
+
+    // If there's no valid exit, the river terminates in the lake.
+    return { shouldTerminate: true };
+  }
+
+  /**
+   * Updates the count of river edges bordering a tile. Used for the hex-wrapping penalty.
+   * @private
+   */
+  static _updateEdgeCounts(edgeId, riverEdgeCountsByTile, map, delta) {
+    const borderedTiles = this._getTilesForEdge(edgeId, map);
+    for (const tile of borderedTiles) {
+      const tileId = `${tile.x},${tile.y}`;
+      const currentCount = riverEdgeCountsByTile.get(tileId) || 0;
+      riverEdgeCountsByTile.set(tileId, currentCount + delta);
+    }
   }
 
   /**
@@ -1334,6 +1360,74 @@ export default class MapGenerator {
     for (const tile of map.grid.flat()) {
       if (tile.biome.id === BiomeLibrary.LAKE.id && tile.feature) {
         tile.feature = null;
+      }
+    }
+  }
+
+  /**
+   * Finds any lakes with rivers on their edges and converts them to a valid land biome.
+   * This is a final cleanup pass to fix any pathfinding artifacts.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @param {object} placeholderBiome The biome object used as the default land tile.
+   * @private
+   */
+  static _cleanupInvalidLakes(map, placeholderBiome) {
+    const lakesToConvert = [];
+    const lakeTiles = map.grid.flat().filter(t => t.biome.id === BiomeLibrary.LAKE.id);
+
+    for (const lakeTile of lakeTiles) {
+      const vertices = this._getVerticesForTile(lakeTile, map);
+      if (vertices.length < 6) continue; // Should not happen on a valid map
+
+      let hasRiverOnEdge = false;
+      for (let i = 0; i < 6; i++) {
+        const v1 = vertices[i];
+        const v2 = vertices[(i + 1) % 6];
+        const edgeId = HexGridUtils.getEdgeId(v1, v2);
+        if (map.rivers.has(edgeId)) {
+          hasRiverOnEdge = true;
+          break;
+        }
+      }
+
+      if (hasRiverOnEdge) {
+        lakesToConvert.push(lakeTile);
+      }
+    }
+
+    if (lakesToConvert.length > 0) {
+      for (const tile of lakesToConvert) {
+        const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
+        const biomeCounts = {};
+        const validLandBiomes = new Set([
+          BiomeLibrary.SAVANNAH.id, BiomeLibrary.GRASSLAND.id, BiomeLibrary.DESERT.id, BiomeLibrary.TUNDRA.id,
+        ]);
+
+        for (const coord of neighbors) {
+          const neighbor = map.getTileAt(coord.x, coord.y);
+          if (neighbor && validLandBiomes.has(neighbor.biome.id)) {
+            const biomeId = neighbor.biome.id;
+            biomeCounts[biomeId] = (biomeCounts[biomeId] || 0) + 1;
+          }
+        }
+
+        if (Object.keys(biomeCounts).length > 0) {
+          let maxCount = 0;
+          let majorityBiomes = [];
+          for (const biomeId in biomeCounts) {
+            if (biomeCounts[biomeId] > maxCount) {
+              maxCount = biomeCounts[biomeId];
+              majorityBiomes = [biomeId];
+            } else if (biomeCounts[biomeId] === maxCount) {
+              majorityBiomes.push(biomeId);
+            }
+          }
+          const chosenBiomeId = majorityBiomes[Math.floor(Math.random() * majorityBiomes.length)];
+          const newBiome = Object.values(BiomeLibrary).find(b => b.id === chosenBiomeId);
+          tile.biome = newBiome;
+        } else {
+          tile.biome = placeholderBiome;
+        }
       }
     }
   }

@@ -1,6 +1,7 @@
 /**
  * @fileoverview Defines the Player class, representing a player in the game.
  */
+import Config from './Config.js';
 import { BuildingLibrary } from './BuildingLibrary.js';
 
 /**
@@ -70,12 +71,7 @@ export default class Player {
    * @private
    */
   _getInitialDeck() {
-    return [
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-      BuildingLibrary.RESIDENCE.id,
-    ];
+    // Return a copy to prevent mutation of the original config array.
+    return [...Config.PlayerConfig.initialDeck];
   }
 }

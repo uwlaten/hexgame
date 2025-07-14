@@ -40,9 +40,16 @@ export default class Game {
   reset() {
     this.player.reset();
     const options = this.uiManager.getGenerationOptions();
-    MapGenerator.generate(this.map, options);
+    const generationLog = MapGenerator.generate(this.map, options);
+
+    // Print the generation log for the new map.
+    console.groupCollapsed('New Map Generation Log');
+    for (const message of generationLog) {
+      console.log(message);
+    }
+    console.groupEnd();
+
     this.renderer.drawMap(this.map);
-    console.log('--- New Game Started ---');
   }
 
   /**

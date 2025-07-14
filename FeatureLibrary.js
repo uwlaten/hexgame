@@ -13,14 +13,14 @@ export const FeatureLibrary = {
       type: 'shapes', // Tells the renderer to interpret the 'shapes' array.
       strokeStyle: '#A0522D', // Sienna brown for the hill lines.
       lineWidth: 2,
+      useSizeFactor: true, // Indicates that params should be scaled by hexSize.
       shapes: [
-        // An array of shapes to draw, with coordinates relative to the hex center.
-        // Format: { type: 'arc', params: [cx, cy, radius, startAngle, endAngle] }
-        { type: 'arc', params: [-8, -2, 4, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [8, -2, 4, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [0, 2, 5, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [-5, 8, 4, Math.PI, 2 * Math.PI] },
-        { type: 'arc', params: [5, 8, 4, Math.PI, 2 * Math.PI] },
+        // An array of shapes to draw, with coordinates as factors of hexSize.
+        { type: 'arc', params: [-0.53, -0.13, 0.27, Math.PI, 2 * Math.PI] },
+        { type: 'arc', params: [0.53, -0.13, 0.27, Math.PI, 2 * Math.PI] },
+        { type: 'arc', params: [0, 0.13, 0.33, Math.PI, 2 * Math.PI] },
+        { type: 'arc', params: [-0.33, 0.53, 0.27, Math.PI, 2 * Math.PI] },
+        { type: 'arc', params: [0.33, 0.53, 0.27, Math.PI, 2 * Math.PI] },
       ],
     },
   },
@@ -30,23 +30,24 @@ export const FeatureLibrary = {
     elevationModifier: 0, // Forests don't change the ground elevation
     draw: {
       type: 'shapes',
+      useSizeFactor: true,
       shapes: [
         // A cluster of 5 small fir trees, each with a trunk and canopy.
         // We draw trunks first, then canopies, to ensure correct layering if they overlap.
 
         // Trunks (Rectangles)
-        { type: 'rect', fillStyle: '#8B4513', params: [-1, 3, 2, 3] },   // Center
-        { type: 'rect', fillStyle: '#8B4513', params: [-8, -3, 2, 3] },  // Top-left
-        { type: 'rect', fillStyle: '#8B4513', params: [6, -3, 2, 3] },   // Top-right
-        { type: 'rect', fillStyle: '#8B4513', params: [-5, 9, 2, 3] },   // Bottom-left
-        { type: 'rect', fillStyle: '#8B4513', params: [3, 9, 2, 3] },    // Bottom-right
+        { type: 'rect', fillStyle: '#8B4513', params: [-0.07, 0.2, 0.13, 0.2] },   // Center
+        { type: 'rect', fillStyle: '#8B4513', params: [-0.53, -0.2, 0.13, 0.2] },  // Top-left
+        { type: 'rect', fillStyle: '#8B4513', params: [0.4, -0.2, 0.13, 0.2] },   // Top-right
+        { type: 'rect', fillStyle: '#8B4513', params: [-0.33, 0.6, 0.13, 0.2] },   // Bottom-left
+        { type: 'rect', fillStyle: '#8B4513', params: [0.2, 0.6, 0.13, 0.2] },    // Bottom-right
 
         // Canopies (Polygons/Triangles)
-        { type: 'polygon', fillStyle: '#2E8B57', params: [ [-4, 3], [4, 3], [0, -2] ] },    // Center
-        { type: 'polygon', fillStyle: '#2E8B57', params: [ [-11, -3], [-3, -3], [-7, -8] ] }, // Top-left
-        { type: 'polygon', fillStyle: '#2E8B57', params: [ [3, -3], [11, -3], [7, -8] ] },  // Top-right
-        { type: 'polygon', fillStyle: '#2E8B57', params: [ [-8, 9], [0, 9], [-4, 4] ] },    // Bottom-left
-        { type: 'polygon', fillStyle: '#2E8B57', params: [ [0, 9], [8, 9], [4, 4] ] },     // Bottom-right
+        { type: 'polygon', fillStyle: '#2E8B57', params: [ [-0.27, 0.2], [0.27, 0.2], [0, -0.13] ] },    // Center
+        { type: 'polygon', fillStyle: '#2E8B57', params: [ [-0.73, -0.2], [-0.2, -0.2], [-0.47, -0.53] ] }, // Top-left
+        { type: 'polygon', fillStyle: '#2E8B57', params: [ [0.2, -0.2], [0.73, -0.2], [0.47, -0.53] ] },  // Top-right
+        { type: 'polygon', fillStyle: '#2E8B57', params: [ [-0.53, 0.6], [0, 0.6], [-0.27, 0.27] ] },    // Bottom-left
+        { type: 'polygon', fillStyle: '#2E8B57', params: [ [0, 0.6], [0.53, 0.6], [0.27, 0.27] ] },     // Bottom-right
       ],
     },
   },

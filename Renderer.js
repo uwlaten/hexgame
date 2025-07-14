@@ -2,6 +2,8 @@
  * @fileoverview Defines the Renderer class for drawing the game state onto a canvas.
  */
 import HexGridUtils from './HexGridUtils.js';
+import DrawingUtils from './DrawingUtils.js';
+import Config from './Config.js';
 import HexTile from './HexTile.js';
 import { Building } from './Building.js';
 import { BuildingLibrary } from './BuildingLibrary.js';
@@ -39,7 +41,7 @@ export default class Renderer {
      * @type {number}
      * @private
      */
-    this._padding = 1;
+    this._padding = Config.RendererConfig.padding;
   }
 
   /**
@@ -82,84 +84,29 @@ export default class Renderer {
     this.ctx.fill();
 
     // Add a border to each hex
-    this.ctx.strokeStyle = '#333'; // A dark border color
-    this.ctx.lineWidth = 1;
+    const borderStyle = Config.RendererConfig.hexBorderStyle;
+    this.ctx.strokeStyle = borderStyle.strokeStyle;
+    this.ctx.lineWidth = borderStyle.lineWidth;
     this.ctx.stroke();
 
     // If the biome itself has special drawing instructions (like waves on water), draw them.
     if (tile.biome.draw) {
-      this._drawDetails(tile.biome, cx, cy);
+      DrawingUtils.drawDetails(this.ctx, tile.biome, cx, cy, this.hexSize);
     }
 
     // If the tile has a feature (like hills), draw it on top of the biome.
-    if (tile.feature) {
-      this._drawDetails(tile.feature, cx, cy);
+    if (tile.feature?.draw) {
+      DrawingUtils.drawDetails(this.ctx, tile.feature, cx, cy, this.hexSize);
     }
 
-    // If the tile has content, draw it.
-    if (tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RESIDENCE.id) {
-      this.ctx.fillStyle = '#8B4513'; // SaddleBrown for a residence
-      this.ctx.beginPath();
-      this.ctx.arc(cx, cy, this.hexSize * 0.5, 0, 2 * Math.PI);
-      this.ctx.fill();
-    }
-  }
-
-  /**
-   * Draws detailed graphics for a biome or feature on a tile.
-   * This method interprets the 'draw' property of a biome or feature object.
-   * @param {object} drawable The biome or feature object containing drawing instructions.
-   * @param {number} cx The center x-coordinate of the hex.
-   * @param {number} cy The center y-coordinate of the hex.
-   * @private
-   */
-  _drawDetails(drawable, cx, cy) {
-    if (!drawable.draw) return; // Nothing to draw.
-
-    this.ctx.save();
-    // Translate the canvas origin to the center of the hex for relative drawing.
-    this.ctx.translate(cx, cy);
-
-    if (drawable.draw.type === 'shapes') {
-      for (const shape of drawable.draw.shapes) {
-        this.ctx.beginPath();
-
-        // Set styles for this specific shape, with fallbacks to the feature-level style.
-        this.ctx.fillStyle = shape.fillStyle || 'transparent';
-        this.ctx.strokeStyle = shape.strokeStyle || drawable.draw.strokeStyle || 'transparent';
-        this.ctx.lineWidth = shape.lineWidth || drawable.draw.lineWidth || 1;
-
-        if (shape.type === 'arc') {
-          const [arcX, arcY, radius, startAngle, endAngle] = shape.params;
-          this.ctx.arc(arcX, arcY, radius, startAngle, endAngle);
-        } else if (shape.type === 'rect') {
-          const [rectX, rectY, width, height] = shape.params;
-          this.ctx.rect(rectX, rectY, width, height);
-        } else if (shape.type === 'circle') {
-          const [circX, circY, radius] = shape.params;
-          this.ctx.arc(circX, circY, radius, 0, 2 * Math.PI);
-        } else if (shape.type === 'polygon') {
-          const points = shape.params;
-          if (points && points.length > 1) {
-            this.ctx.moveTo(points[0][0], points[0][1]);
-            for (let i = 1; i < points.length; i++) {
-              this.ctx.lineTo(points[i][0], points[i][1]);
-            }
-            this.ctx.closePath();
-          }
-        }
-
-        // Draw the shape based on the styles provided.
-        if (this.ctx.fillStyle !== 'transparent') {
-          this.ctx.fill();
-        }
-        if (this.ctx.strokeStyle !== 'transparent') {
-          this.ctx.stroke();
-        }
+    // If the tile has content (like a building), draw it.
+    if (tile.contentType instanceof Building) {
+      // Look up the building's definition in the library using its type ID.
+      const buildingDefinition = Object.values(BuildingLibrary).find(b => b.id === tile.contentType.type);
+      if (buildingDefinition?.draw) {
+        DrawingUtils.drawDetails(this.ctx, buildingDefinition, cx, cy, this.hexSize);
       }
     }
-
-    this.ctx.restore(); // Restore the canvas origin.
   }
 
   /**
@@ -263,10 +210,11 @@ export default class Renderer {
   _drawRivers(map) {
     if (map.rivers.size === 0) return;
 
-    this.ctx.strokeStyle = '#0064a7ff'; // A nice river blue, same as lakes
-    this.ctx.lineWidth = 4;
-    this.ctx.lineCap = 'round';
-    this.ctx.lineJoin = 'round';
+    const riverStyle = Config.RendererConfig.riverStyle;
+    this.ctx.strokeStyle = riverStyle.strokeStyle;
+    this.ctx.lineWidth = riverStyle.lineWidth;
+    this.ctx.lineCap = riverStyle.lineCap;
+    this.ctx.lineJoin = riverStyle.lineJoin;
 
     for (const edgeId of map.rivers) {
       const [vertexId1, vertexId2] = HexGridUtils.getVerticesForEdge(edgeId);
