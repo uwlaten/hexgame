@@ -7,12 +7,13 @@
 // Using export default to make it easy to import this single config object elsewhere.
 export default {
   /**
-   * Defines the dimensions of the game map in tiles.
+   * Defines the *default* dimensions of the game map in tiles.
+   * These are used on initial load. Subsequent maps are sized by the UI.
    * width: The number of tiles horizontally.
    * height: The number of tiles vertically.
    */
   mapDimensions: {
-    width: 25,
+    width: 20,
     height: 20,
   },
 
@@ -124,6 +125,7 @@ export default {
     generationSliderRanges: {
       temperature: { min: 0, max: 2, step: 1, value: 1 },
       waterLevel: { min: 20, max: 70, step: 1, value: 40 },
+      mapSize: { min: 10, max: 30, step: 1, value: 20 },
     },
     nextTileDisplay: {
       width: 60,

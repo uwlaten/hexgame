@@ -31,6 +31,8 @@ export default class UIManager {
     this.temperatureOutput = null;
     this.waterSlider = null;
     this.waterOutput = null;
+    this.mapSizeSlider = null;
+    this.mapSizeOutput = null;
     this.nextTileLabel = null;
     this.nextTileCanvas = null;
     this.nextTileCtx = null;
@@ -111,7 +113,34 @@ export default class UIManager {
 
     waterContainer.append(waterLabel, this.waterSlider, this.waterOutput);
 
-    this.configPanelContainer.append(tempContainer, waterContainer);
+    // --- Map Size Slider ---
+    const mapSizeContainer = document.createElement('div');
+    mapSizeContainer.className = 'slider-control';
+
+    const mapSizeLabel = document.createElement('label');
+    mapSizeLabel.htmlFor = 'map-size-slider';
+    mapSizeLabel.textContent = 'Size:';
+
+    const mapSizeConfig = Config.UIConfig.generationSliderRanges.mapSize;
+    this.mapSizeSlider = document.createElement('input');
+    this.mapSizeSlider.type = 'range';
+    this.mapSizeSlider.id = 'map-size-slider';
+    this.mapSizeSlider.min = mapSizeConfig.min;
+    this.mapSizeSlider.max = mapSizeConfig.max;
+    this.mapSizeSlider.step = mapSizeConfig.step;
+    this.mapSizeSlider.value = mapSizeConfig.value;
+
+    this.mapSizeOutput = document.createElement('output');
+    this.mapSizeOutput.htmlFor = 'map-size-slider';
+    this.mapSizeOutput.textContent = `${this.mapSizeSlider.value}x${this.mapSizeSlider.value}`;
+
+    this.mapSizeSlider.addEventListener('input', () => {
+      this.mapSizeOutput.textContent = `${this.mapSizeSlider.value}x${this.mapSizeSlider.value}`;
+    });
+
+    mapSizeContainer.append(mapSizeLabel, this.mapSizeSlider, this.mapSizeOutput);
+
+    this.configPanelContainer.append(tempContainer, waterContainer, mapSizeContainer);
   }
 
   /**
@@ -136,8 +165,9 @@ export default class UIManager {
     const tempValues = ['cold', 'temperate', 'hot'];
     const temperature = tempValues[this.temperatureSlider.value];
     const waterLevel = parseInt(this.waterSlider.value, 10);
+    const mapSize = parseInt(this.mapSizeSlider.value, 10);
 
-    return { waterLevel, temperature };
+    return { waterLevel, temperature, mapSize };
   }
 
   /**

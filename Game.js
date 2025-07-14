@@ -49,6 +49,11 @@ export default class Game {
     }
     console.groupEnd();
 
+    // Resize the canvas to fit the new map dimensions.
+    const dimensions = this.renderer.getRequiredCanvasDimensions(this.map);
+    this.renderer.canvas.width = dimensions.width;
+    this.renderer.canvas.height = dimensions.height;
+
     this.renderer.drawMap(this.map);
   }
 

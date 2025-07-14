@@ -28,9 +28,16 @@ export default class MapGenerator {
    * @returns {string[]} An array of log messages generated during the process.
    */
   static generate(map, options = {}) {
-    const { waterLevel = 40, temperature = 'temperate' } = options;
+    const { waterLevel = 40, temperature = 'temperate', mapSize } = options;
+
+    // If mapSize is provided by the UI, override the map's default dimensions.
+    if (mapSize) {
+      map.width = mapSize;
+      map.height = mapSize;
+    }
+
     const log = [];
-    log.push(`Generating map with options: waterLevel=${waterLevel}, temperature=${temperature}`);
+    log.push(`Generating map with options: waterLevel=${waterLevel}, temperature=${temperature}, size=${map.width}x${map.height}`);
 
     const placeholderBiome = Object.values(BiomeLibrary).find(b => b.isDefaultPlaceholder);
     if (!placeholderBiome) {
@@ -100,6 +107,12 @@ export default class MapGenerator {
 
     // 11. Place resources on the now-finalized map.
     this._generateResources(map, log);
+
+    // --- Final Log Summary ---
+    const totalTiles = map.width * map.height;
+    const oceanTiles = map.grid.flat().filter(tile => tile.biome.id === BiomeLibrary.OCEAN.id).length;
+    const oceanPercentage = ((oceanTiles / totalTiles) * 100).toFixed(1);
+    log.push(`Final map composition: ${oceanTiles} ocean tiles (${oceanPercentage}% of total).`);
 
     return log;
   }
@@ -948,7 +961,7 @@ export default class MapGenerator {
         }
 
         const startVertex = vertices[Math.floor(Math.random() * vertices.length)];
-        const { path: riverPath, endVertex } = this._findRiverPathFromSource(startVertex, map, map.rivers);
+        const { path: riverPath, endVertex, formedLakeAt } = this._findRiverPathFromSource(startVertex, map, map.rivers);
 
         // --- New Validation: Check if the river ends too close to its source ---
         let endsTooClose = false;
@@ -968,7 +981,17 @@ export default class MapGenerator {
         }
 
         if (riverPath.length >= config.minLength && !endsTooClose) {
-          log.push(`River from (${sourceTile.x}, ${sourceTile.y}) is valid with length ${riverPath.length}.`);
+          if (formedLakeAt) {
+            log.push(`River from (${sourceTile.x}, ${sourceTile.y}) is valid with length ${riverPath.length}, forming a lake at (${formedLakeAt.x}, ${formedLakeAt.y}).`);
+            const lakeTile = map.getTileAt(formedLakeAt.x, formedLakeAt.y);
+            if (lakeTile) {
+              // The river is valid, so now we can safely create the lake.
+              lakeTile.biome = BiomeLibrary.LAKE;
+            }
+          } else {
+            log.push(`River from (${sourceTile.x}, ${sourceTile.y}) is valid with length ${riverPath.length}.`);
+          }
+
           for (const edgeId of riverPath) {
             map.rivers.add(edgeId);
           }
@@ -1048,7 +1071,7 @@ export default class MapGenerator {
    * @param {string} startVertex The ID of the vertex where the river begins.
    * @param {import('./Map.js').default} map The map object.
    * @param {Set<string>} existingRivers A set of edge IDs for already generated rivers.
-   * @returns {{path: string[], endVertex: string}} The generated path and its final vertex.
+   * @returns {{path: string[], endVertex: string, formedLakeAt: {x: number, y: number}|null}} The generated path, its final vertex, and any potential lake.
    * @private
    */
   static _findRiverPathFromSource(startVertex, map, existingRivers) {
@@ -1058,12 +1081,16 @@ export default class MapGenerator {
 
     const result = this._exploreRiverPath(startVertex, null, visitedVertices, riverEdgeCountsByTile, map, existingRivers, maxDepth);
 
-    return { path: result.path || [], endVertex: result.endVertex || startVertex };
+    return {
+      path: result.path || [],
+      endVertex: result.endVertex || startVertex,
+      formedLakeAt: result.formedLakeAt || null,
+    };
   }
 
   /**
    * Recursively explores paths for a river using backtracking.
-   * @returns {{success: boolean, path: string[], endVertex: string}}
+   * @returns {{success: boolean, path: string[], endVertex: string, formedLakeAt: {x: number, y: number}|null}}
    * @private
    */
   static _exploreRiverPath(currentVertex, previousVertex, visitedVertices, riverEdgeCountsByTile, map, existingRivers, depth) {
@@ -1202,7 +1229,7 @@ export default class MapGenerator {
 
   /**
    * Attempts to form a lake when a river path is stuck.
-   * @returns {{success: boolean, path: string[], endVertex: string}|{success: boolean}}
+   * @returns {{success: boolean, path: string[], endVertex: string, formedLakeAt: {x: number, y: number}}|{success: boolean}}
    * @private
    */
   static _attemptLakeFormation(currentVertex, previousVertex, map) {
@@ -1221,9 +1248,14 @@ export default class MapGenerator {
                        forwardTile.biome.id !== BiomeLibrary.LAKE.id;
 
       if (canFlood) {
-        forwardTile.biome = BiomeLibrary.LAKE;
-        // A successfully formed lake is a valid termination point for a river.
-        return { success: true, path: [], endVertex: currentVertex };
+        // Instead of creating the lake, we signal where it *should* be created.
+        // The lake will only be formed if the river path is validated.
+        return {
+          success: true,
+          path: [],
+          endVertex: currentVertex,
+          formedLakeAt: { x: forwardTile.x, y: forwardTile.y },
+        };
       }
     }
     // If no lake can be formed, this path is a failure.
