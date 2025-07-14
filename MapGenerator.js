@@ -4,6 +4,7 @@
  */
 
 import HexTile from './HexTile.js';
+import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
 import { FeatureLibrary } from './FeatureLibrary.js';
 import { createNoise2D } from 'https://cdn.skypack.dev/simplex-noise';
@@ -59,6 +60,7 @@ export default class MapGenerator {
     const seaLevelThreshold = allElevations[seaLevelIndex];
 
     // Ensure the grid is empty before we start generating.
+    map.rivers.clear(); // Clear any previous river data.
     map.grid = [];
 
     // 4. Create tiles based on the final elevation and sea level.
@@ -85,7 +87,10 @@ export default class MapGenerator {
     // 8. Add forests based on climate.
     this._generateForests(map, moistureMap);
 
-    // 9. Run final post-processing passes to clean up the map.
+    // 9. Generate rivers.
+    this._generateRivers(map);
+
+    // 10. Run final post-processing passes to clean up the map.
     this._runPostProcessingPasses(map, placeholderBiome);
   }
 
@@ -185,7 +190,7 @@ export default class MapGenerator {
       const isEdge = tile.x === 0 || tile.x === map.width - 1 || tile.y === 0 || tile.y === map.height - 1;
       if (isEdge) continue;
 
-      const neighbors = this._getNeighbors(tile.x, tile.y);
+      const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
       const isCoastal = neighbors.some(coord => {
         const neighborTile = map.getTileAt(coord.x, coord.y);
         return neighborTile?.biome.id === BiomeLibrary.OCEAN.id;
@@ -225,7 +230,7 @@ export default class MapGenerator {
         allMountainCoords.add(currentKey);
 
         // NEW RULE: After placing a mountain, check if it connects to another range.
-        const neighborsOfCurrent = this._getNeighbors(currentTile.x, currentTile.y);
+        const neighborsOfCurrent = HexGridUtils.getNeighbors(currentTile.x, currentTile.y);
         const touchesOtherMountain = neighborsOfCurrent.some(c => {
           const key = `${c.x},${c.y}`;
           return allMountainCoords.has(key) && !currentRangeTiles.has(key);
@@ -236,10 +241,10 @@ export default class MapGenerator {
 
         // Create a "bulge" in the mountain range.
         if (Math.random() < mountainConfig.bulgeChance) {
-          const neighbors = this._getNeighbors(currentTile.x, currentTile.y);
+          const neighbors = HexGridUtils.getNeighbors(currentTile.x, currentTile.y);
           const randomNeighborCoords = neighbors[Math.floor(Math.random() * neighbors.length)];
           const bulgeTile = map.getTileAt(randomNeighborCoords.x, randomNeighborCoords.y);
-          const bulgeTouchesOther = this._getNeighbors(randomNeighborCoords.x, randomNeighborCoords.y).some(c => {
+          const bulgeTouchesOther = HexGridUtils.getNeighbors(randomNeighborCoords.x, randomNeighborCoords.y).some(c => {
             const key = `${c.x},${c.y}`;
             return allMountainCoords.has(key) && !currentRangeTiles.has(key);
           });
@@ -249,12 +254,12 @@ export default class MapGenerator {
         }
 
         // --- New Direction Selection Logic ---
-        const allNeighbors = this._getNeighbors(currentTile.x, currentTile.y);
+        const allNeighbors = HexGridUtils.getNeighbors(currentTile.x, currentTile.y);
         const forwardDirections = [(direction - 1 + 6) % 6, direction, (direction + 1) % 6];
 
         // Calculate the overall vector from the start of the range to the current tile.
-        const startCube = this._offsetToCube(startTile.x, startTile.y);
-        const currentCube = this._offsetToCube(currentTile.x, currentTile.y);
+        const startCube = HexGridUtils.offsetToCube(startTile.x, startTile.y);
+        const currentCube = HexGridUtils.offsetToCube(currentTile.x, currentTile.y);
         const overallVector = {
           q: currentCube.q - startCube.q,
           r: currentCube.r - startCube.r,
@@ -280,7 +285,7 @@ export default class MapGenerator {
           // Penalize moving back towards the start of the range to prevent U-shapes.
           // We only do this after a few steps to allow the range to establish a direction.
           if (j > 2) {
-            const nextCube = this._offsetToCube(coord.x, coord.y);
+            const nextCube = HexGridUtils.offsetToCube(coord.x, coord.y);
             const stepVector = {
               q: nextCube.q - currentCube.q,
               r: nextCube.r - currentCube.r,
@@ -337,7 +342,7 @@ export default class MapGenerator {
       if (isEdge) continue;
 
       // Rule: Forbid placing lone peaks adjacent to any existing mountain.
-      const isAdjacentToMountain = this._getNeighbors(tile.x, tile.y).some(c =>
+      const isAdjacentToMountain = HexGridUtils.getNeighbors(tile.x, tile.y).some(c =>
         allMountainCoords.has(`${c.x},${c.y}`)
       );
       if (isAdjacentToMountain) continue;
@@ -357,65 +362,6 @@ export default class MapGenerator {
    */
   static _getLandTiles(map) {
     return map.grid.flat().filter(tile => tile.biome.id !== BiomeLibrary.OCEAN.id);
-  }
-
-  /**
-   * Gets the coordinates of the 6 neighbors for a hex in an "odd-r" layout.
-   * @param {number} x The x-coordinate of the hex.
-   * @param {number} y The y-coordinate of the hex.
-   * @returns {Array<{x: number, y: number}>} An array of neighbor coordinates.
-   * @private
-   */
-  static _getNeighbors(x, y) {
-    const isOddRow = y & 1;
-    const directions = [
-      // Even rows
-      [
-        { x: x + 1, y: y },     // E
-        { x: x, y: y + 1 },     // SE
-        { x: x - 1, y: y + 1 }, // SW
-        { x: x - 1, y: y },     // W
-        { x: x - 1, y: y - 1 }, // NW
-        { x: x, y: y - 1 },     // NE
-      ],
-      // Odd rows
-      [
-        { x: x + 1, y: y },     // E
-        { x: x + 1, y: y + 1 }, // SE
-        { x: x, y: y + 1 },     // SW
-        { x: x - 1, y: y },     // W
-        { x: x, y: y - 1 },     // NW
-        { x: x + 1, y: y - 1 }, // NE
-      ],
-    ];
-
-    return directions[isOddRow];
-  }
-
-  /**
-   * Converts "odd-r" offset coordinates to cube coordinates.
-   * @param {number} x The x-coordinate (col).
-   * @param {number} y The y-coordinate (row).
-   * @returns {{q: number, r: number, s: number}} The cube coordinates.
-   * @private
-   */
-  static _offsetToCube(x, y) {
-    const q = x - (y - (y & 1)) / 2;
-    const r = y;
-    const s = -q - r;
-    return { q, r, s };
-  }
-
-  /**
-   * Calculates the grid distance between two hexes using their cube coordinates.
-   * @param {{q: number, r: number, s: number}} a The cube coordinates of the first hex.
-   * @param {{q: number, r: number, s: number}} b The cube coordinates of the second hex.
-   * @returns {number} The distance in hexes.
-   * @private
-   */
-  static _getCubeDistance(a, b) {
-    // This is the standard distance formula for cube coordinates.
-    return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
   }
 
   /**
@@ -480,7 +426,7 @@ export default class MapGenerator {
         const tile = map.getTileAt(x, y);
         if (tile.biome.id === BiomeLibrary.OCEAN.id) continue;
 
-        const isCoastal = this._getNeighbors(x, y).some(c => map.getTileAt(c.x, c.y)?.biome.id === BiomeLibrary.OCEAN.id);
+        const isCoastal = HexGridUtils.getNeighbors(x, y).some(c => map.getTileAt(c.x, c.y)?.biome.id === BiomeLibrary.OCEAN.id);
         if (isCoastal) {
           // Positive value warms the north, negative value cools the south.
           const baseTemp = baseTemperatureMap[y][x];
@@ -494,7 +440,7 @@ export default class MapGenerator {
       const nextModerationMap = Array.from({ length: map.height }, () => Array(map.width).fill(0));
       for (let y = 0; y < map.height; y++) {
         for (let x = 0; x < map.width; x++) {
-          const neighbors = this._getNeighbors(x, y);
+          const neighbors = HexGridUtils.getNeighbors(x, y);
           let sum = moderationMap[y][x];
           let count = 1;
           for (const coord of neighbors) {
@@ -639,11 +585,11 @@ export default class MapGenerator {
     // Rule 1: Check for deserts too close to tundra
     if (tundraTiles.length > 0 && desertTiles.length > 0) {
       for (const desert of desertTiles) {
-        const desertCube = this._offsetToCube(desert.x, desert.y);
+        const desertCube = HexGridUtils.offsetToCube(desert.x, desert.y);
         let tooClose = false;
         for (const tundra of tundraTiles) {
-          const tundraCube = this._offsetToCube(tundra.x, tundra.y);
-          if (this._getCubeDistance(desertCube, tundraCube) <= 3) {
+          const tundraCube = HexGridUtils.offsetToCube(tundra.x, tundra.y);
+          if (HexGridUtils.getCubeDistance(desertCube, tundraCube) <= 3) {
             tooClose = true;
             break;
           }
@@ -666,7 +612,7 @@ export default class MapGenerator {
 
     // Now, perform the conversions for all flagged tiles
     for (const tile of tilesToConvert) {
-      const neighbors = this._getNeighbors(tile.x, tile.y);
+      const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
       let savannahNeighbors = 0;
       let grasslandNeighbors = 0;
 
@@ -698,6 +644,9 @@ export default class MapGenerator {
 
     // Pass 3: Convert small, land-locked oceans into lakes.
     this._convertInlandSeasToLakes(map);
+
+    // Pass 4: Clean up any features that might be on new lake tiles.
+    this._removeFeaturesFromLakes(map);
   }
 
   /**
@@ -738,7 +687,7 @@ export default class MapGenerator {
 
         // Check for the "oasis" rule on desert tiles.
         if (biomeId === BiomeLibrary.DESERT.id) {
-          const isAdjacentToWater = this._getNeighbors(x, y).some(c => {
+          const isAdjacentToWater = HexGridUtils.getNeighbors(x, y).some(c => {
             const neighbor = map.getTileAt(c.x, c.y);
             return neighbor && (neighbor.biome.id === BiomeLibrary.OCEAN.id || neighbor.biome.id === BiomeLibrary.LAKE.id);
           });
@@ -780,7 +729,7 @@ export default class MapGenerator {
     // 1. Initialize the queue with all valid tiles directly adjacent to mountains.
     for (const tile of allLandTiles) {
       if (tile.biome.id === BiomeLibrary.MOUNTAIN.id) {
-        const neighbors = this._getNeighbors(tile.x, tile.y);
+        const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
         for (const coord of neighbors) {
           const neighborTile = map.getTileAt(coord.x, coord.y);
           // Check if the neighbor can support features and hasn't been queued yet.
@@ -803,7 +752,7 @@ export default class MapGenerator {
         tile.feature = FeatureLibrary.HILLS;
 
         // If a hill is placed, add its neighbors to the queue to continue the spread.
-        const neighbors = this._getNeighbors(tile.x, tile.y);
+        const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
         for (const coord of neighbors) {
           const neighborTile = map.getTileAt(coord.x, coord.y);
           if (neighborTile && neighborTile.biome.canSupportFeatures && !neighborTile.feature && !visited.has(neighborTile)) {
@@ -823,7 +772,7 @@ export default class MapGenerator {
       if (elevationMap[tile.y][tile.x] < hillsConfig.isolatedHillElevationThreshold) continue;
 
       // Ensure it's not adjacent to a mountain to keep it truly isolated.
-      const isAdjacentToMountain = this._getNeighbors(tile.x, tile.y).some(c => map.getTileAt(c.x, c.y)?.biome.id === BiomeLibrary.MOUNTAIN.id);
+      const isAdjacentToMountain = HexGridUtils.getNeighbors(tile.x, tile.y).some(c => map.getTileAt(c.x, c.y)?.biome.id === BiomeLibrary.MOUNTAIN.id);
       if (!isAdjacentToMountain && Math.random() < hillsConfig.isolatedHillChance) {
         tile.feature = FeatureLibrary.HILLS;
       }
@@ -882,7 +831,7 @@ export default class MapGenerator {
       }
 
       const biomeCounts = {};
-      for (const coord of this._getNeighbors(tile.x, tile.y)) {
+      for (const coord of HexGridUtils.getNeighbors(tile.x, tile.y)) {
         const neighbor = map.getTileAt(coord.x, coord.y);
         // When counting, we ignore neighbors that are structural.
         if (neighbor && !biomesToIgnore.has(neighbor.biome.id)) {
@@ -955,7 +904,7 @@ export default class MapGenerator {
           }
 
           // Add its unvisited ocean neighbors to the queue to continue the search.
-          for (const coord of this._getNeighbors(currentTile.x, currentTile.y)) {
+          for (const coord of HexGridUtils.getNeighbors(currentTile.x, currentTile.y)) {
             const neighbor = map.getTileAt(coord.x, coord.y);
             if (neighbor && neighbor.biome.id === BiomeLibrary.OCEAN.id && !visited.has(neighbor)) {
               visited.add(neighbor);
@@ -971,6 +920,420 @@ export default class MapGenerator {
             tile.biome = BiomeLibrary.LAKE;
           }
         }
+      }
+    }
+  }
+
+  /**
+   * The main method for the Hydrology Phase. Generates rivers on the map.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @private
+   */
+  static _generateRivers(map) {
+    const riverConfig = {
+      numRivers: { min: 2, max: 4 },
+      sourceWeights: {
+        [BiomeLibrary.MOUNTAIN.id]: 2, // Mountains are a likely source.
+        [BiomeLibrary.ICE.id]: 0,      // Glaciers are a potential future source
+        [FeatureLibrary.HILLS.id]: 1,
+      },
+      minLength: 7, // A river must have at least this many segments.
+      maxAttemptsPerRiver: 10, // Prevents infinite loops if no good sources are left.
+    };
+
+    // 1. Identify all potential source tiles on the map.
+    const potentialSources = [];
+    for (const tile of this._getLandTiles(map)) {
+      let weight = 0;
+      if (tile.biome.id === BiomeLibrary.MOUNTAIN.id) {
+        weight = riverConfig.sourceWeights[BiomeLibrary.MOUNTAIN.id];
+      } else if (tile.biome.id === BiomeLibrary.ICE.id) {
+        weight = riverConfig.sourceWeights[BiomeLibrary.ICE.id];
+      } else if (tile.feature?.id === FeatureLibrary.HILLS.id) {
+        weight = riverConfig.sourceWeights[FeatureLibrary.HILLS.id];
+      }
+
+      if (weight > 0) {
+        potentialSources.push({ tile, weight });
+      }
+    }
+
+    if (potentialSources.length === 0) return;
+
+    // 2. Determine how many rivers to generate.
+    const numRiversToGenerate = Math.floor(Math.random() * (riverConfig.numRivers.max - riverConfig.numRivers.min + 1)) + riverConfig.numRivers.min;
+    console.log(`--- Attempting to generate ${numRiversToGenerate} Rivers ---`);
+
+    let riversGenerated = 0;
+    while (riversGenerated < numRiversToGenerate && potentialSources.length > 0) {
+      let riverIsValid = false;
+      for (let attempt = 0; attempt < riverConfig.maxAttemptsPerRiver; attempt++) {
+        if (potentialSources.length === 0) break; // No more sources to try
+
+        const sourceChoice = this._getWeightedRandomChoice(potentialSources);
+        if (!sourceChoice) continue;
+
+        const sourceTile = sourceChoice.tile;
+        const sourceIndex = potentialSources.indexOf(sourceChoice);
+
+        const vertices = this._getVerticesForTile(sourceTile, map);
+        if (vertices.length === 0) {
+          if (sourceIndex > -1) potentialSources.splice(sourceIndex, 1);
+          continue; // This source is unusable, try again.
+        }
+
+        const startVertex = vertices[Math.floor(Math.random() * vertices.length)];
+        const { path: riverPath, endVertex } = this._createRiverPath(startVertex, map, map.rivers);
+
+        // --- New Validation: Check if the river ends too close to its source ---
+        let endsTooClose = false;
+        // A river path of length 0 or 1 is already caught by minLength. This check is for longer paths that loop back.
+        if (riverPath.length > 1) {
+          const sourceCube = HexGridUtils.offsetToCube(sourceTile.x, sourceTile.y);
+          const endTiles = HexGridUtils.getTilesForVertex(endVertex).map(c => map.getTileAt(c.x, c.y));
+          for (const tile of endTiles) {
+            if (tile) {
+              const endCube = HexGridUtils.offsetToCube(tile.x, tile.y);
+              if (HexGridUtils.getCubeDistance(sourceCube, endCube) <= 1) {
+                endsTooClose = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (riverPath.length >= riverConfig.minLength && !endsTooClose) {
+          console.log(`River from (${sourceTile.x}, ${sourceTile.y}) is valid with length ${riverPath.length}.`);
+          for (const edgeId of riverPath) {
+            map.rivers.add(edgeId);
+          }
+          riverIsValid = true;
+          break; // Success, break from the attempt loop.
+        } else {
+          // River is too short, remove this source from the pool and try another.
+          if (sourceIndex > -1) {
+            potentialSources.splice(sourceIndex, 1);
+          }
+        }
+      }
+
+      if (riverIsValid) {
+        riversGenerated++;
+      }
+    }
+  }
+
+  /**
+   * Calculates the effective elevation of a single tile, considering its biome and features.
+   * @param {import('./HexTile.js').default} tile The tile to evaluate.
+   * @returns {number} The effective elevation.
+   * @private
+   */
+  static _getTileEffectiveElevation(tile) {
+    if (!tile) return -Infinity; // Treat off-map as infinitely low.
+    const biomeElevation = tile.biome.elevation ?? 0;
+    const featureModifier = tile.feature?.elevationModifier ?? 0;
+    return biomeElevation + featureModifier;
+  }
+
+  /**
+   * Calculates the elevation of a vertex by averaging the elevation of its 3 surrounding tiles.
+   * @param {string} vertexId The unique ID of the vertex.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {number} The calculated elevation of the vertex.
+   * @private
+   */
+  static _getVertexElevation(vertexId, map) {
+    const tileCoords = HexGridUtils.getTilesForVertex(vertexId);
+    let totalElevation = 0;
+    for (const coord of tileCoords) {
+      const tile = map.getTileAt(coord.x, coord.y);
+      totalElevation += this._getTileEffectiveElevation(tile);
+    }
+    return totalElevation / tileCoords.length;
+  }
+
+  /**
+   * Gets the 6 vertices that form the corners of a given tile.
+   * @param {import('./HexTile.js').default} tile The tile to get vertices for.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {string[]} An array of 6 unique vertex IDs.
+   * @private
+   */
+  static _getVerticesForTile(tile, map) {
+    const vertices = new Set();
+    const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y));
+
+    // A vertex is defined by a tile and two of its adjacent neighbors.
+    // We loop through the neighbors to define all 6 vertices.
+    for (let i = 0; i < 6; i++) {
+      const neighbor1 = neighbors[i];
+      const neighbor2 = neighbors[(i + 1) % 6];
+      const vertexId = HexGridUtils.getVertexIdFromTiles(tile, neighbor1, neighbor2);
+      if (vertexId) {
+        vertices.add(vertexId);
+      }
+    }
+    return Array.from(vertices);
+  }
+
+  /**
+   * Creates a single river path starting from a given vertex.
+   * @param {string} startVertex The ID of the vertex where the river begins.
+   * @param {import('./Map.js').default} map The map object.
+   * @param {Set<string>} existingRivers A set of edge IDs for already generated rivers.
+   * @returns {string[]} An array of edge IDs representing the river's path.
+   * @private
+   */
+  static _createRiverPath(startVertex, map, existingRivers) {
+    const riverPath = [];
+    const visitedVertices = new Set();
+    const riverEdgeCountsByTile = new Map(); // Key: 'x,y', Value: count
+    let previousVertex = null;
+    let currentVertex = startVertex;
+    visitedVertices.add(currentVertex);
+
+    for (let i = 0; i < 100; i++) { // Max length to prevent infinite loops
+      const currentElevation = this._getVertexElevation(currentVertex, map);
+
+      // Check for termination: has the river reached the ocean?
+      const surroundingTiles = HexGridUtils.getTilesForVertex(currentVertex).map(c => map.getTileAt(c.x, c.y));
+      if (surroundingTiles.some(t => t?.biome.id === BiomeLibrary.OCEAN.id)) {
+        break;
+      }
+
+      // Find valid, unvisited neighbor vertices
+      const neighborVertices = this._getNeighborVertices(currentVertex, map);
+      const candidates = [];
+
+      // --- U-Turn Heuristic: Get incoming vector ---
+      let incomingVector = null;
+      if (previousVertex) {
+        const prevCenter = HexGridUtils.getVertexCenterCube(previousVertex, map);
+        const currentCenter = HexGridUtils.getVertexCenterCube(currentVertex, map);
+        if (prevCenter && currentCenter) {
+          incomingVector = {
+            q: currentCenter.q - prevCenter.q,
+            r: currentCenter.r - prevCenter.r,
+          };
+        }
+      }
+
+      for (const neighbor of neighborVertices) {
+        if (!visitedVertices.has(neighbor)) {
+          const neighborElevation = this._getVertexElevation(neighbor, map);
+          // Allow flow to downhill or equal-elevation vertices.
+          if (neighborElevation <= currentElevation) {
+            // Weight is higher for a steeper drop, with a base for flat paths.
+            const elevationDrop = currentElevation - neighborElevation;
+            let weight = 1.0 + elevationDrop * 10.0;
+
+            // --- NEW: Hex-wrapping penalty ---
+            const tempEdgeId = HexGridUtils.getEdgeId(currentVertex, neighbor);
+            const borderedTiles = this._getTilesForEdge(tempEdgeId, map);
+            for (const tile of borderedTiles) {
+              const tileId = `${tile.x},${tile.y}`;
+              const currentCount = riverEdgeCountsByTile.get(tileId) || 0;
+              // If adding this edge makes it the 5th (or more) edge on this tile for this river
+              if (currentCount + 1 >= 5) {
+                weight *= 0.01; // Heavily penalize wrapping around a hex
+              }
+            }
+
+            // --- U-Turn Heuristic: Apply penalty ---
+            if (incomingVector) {
+              const currentCenter = HexGridUtils.getVertexCenterCube(currentVertex, map);
+              const neighborCenter = HexGridUtils.getVertexCenterCube(neighbor, map);
+              if (currentCenter && neighborCenter) {
+                const outgoingVector = { q: neighborCenter.q - currentCenter.q, r: neighborCenter.r - currentCenter.r };
+                const dotProduct = incomingVector.q * outgoingVector.q + incomingVector.r * outgoingVector.r;
+                if (dotProduct < 0) weight *= 0.1; // Penalize sharp turns
+              }
+            }
+            candidates.push({ vertex: neighbor, weight: weight });
+          }
+        }
+      }
+
+      if (candidates.length === 0) {
+        // --- Lake Formation Logic ---
+        // If the river is stuck and has moved at least one step, try to form a lake.
+        if (previousVertex) {
+          const currentTileCoords = HexGridUtils.getTilesForVertex(currentVertex);
+          const previousTileSet = new Set(HexGridUtils.getTilesForVertex(previousVertex).map(c => `${c.x},${c.y}`));
+
+          // The "forward" tile is the one in the current vertex that wasn't in the previous one.
+          const forwardTileCoord = currentTileCoords.find(c => !previousTileSet.has(`${c.x},${c.y}`));
+
+          if (forwardTileCoord) {
+            const forwardTile = map.getTileAt(forwardTileCoord.x, forwardTileCoord.y);
+            // Check if the target tile is a valid type to be flooded.
+            const canFlood = forwardTile &&
+                             forwardTile.biome.id !== BiomeLibrary.MOUNTAIN.id &&
+                             forwardTile.biome.id !== BiomeLibrary.ICE.id &&
+                             forwardTile.biome.id !== BiomeLibrary.OCEAN.id &&
+                             forwardTile.biome.id !== BiomeLibrary.LAKE.id;
+
+            if (canFlood) {
+              forwardTile.biome = BiomeLibrary.LAKE;
+            }
+          }
+        }
+        break; // River terminates, either by forming a lake or getting stuck.
+      }
+
+      // Find the next vertex using a weighted random choice.
+      const choice = this._getWeightedRandomChoice(candidates);
+      if (!choice) {
+        // This should not happen if candidates.length > 0, but as a safeguard:
+        break;
+      }
+      const nextVertex = choice.vertex;
+
+      const edgeId = HexGridUtils.getEdgeId(currentVertex, nextVertex);
+
+      // --- Termination Check 1: Merge with existing river ---
+      if (existingRivers.has(edgeId)) {
+        break;
+      }
+
+      // --- Termination Check 2: Lake Interaction ---
+      const nextSurroundingTiles = HexGridUtils.getTilesForVertex(nextVertex).map(c => map.getTileAt(c.x, c.y));
+      const lakeTile = nextSurroundingTiles.find(t => t?.biome.id === BiomeLibrary.LAKE.id);
+
+      if (lakeTile) {
+        const desertNeighbors = HexGridUtils.getNeighbors(lakeTile.x, lakeTile.y)
+          .map(c => map.getTileAt(c.x, c.y))
+          .filter(t => t?.biome.id === BiomeLibrary.DESERT.id).length;
+
+        // Rule: If a river enters a lake with 4+ desert neighbors, it terminates.
+        if (desertNeighbors >= 4) {
+          riverPath.push(edgeId); // Add final segment into the lake
+          break;
+        }
+
+        // --- Flow-Through Logic ---
+        riverPath.push(edgeId); // Add segment flowing into the lake.
+        const entryVertex = nextVertex;
+        const exitVertex = this._findOppositeVertex(entryVertex, lakeTile, map);
+
+        if (exitVertex && !visitedVertices.has(exitVertex)) {
+          previousVertex = entryVertex;
+          currentVertex = exitVertex;
+          visitedVertices.add(currentVertex);
+          continue; // Jump across the lake and continue pathfinding.
+        }
+      }
+
+      // If we've reached this point, the edge is valid and will be added to the path.
+      // Update the edge counts for the tiles this new segment borders.
+      const finalBorderedTiles = this._getTilesForEdge(edgeId, map);
+      for (const tile of finalBorderedTiles) {
+        const tileId = `${tile.x},${tile.y}`;
+        const currentCount = riverEdgeCountsByTile.get(tileId) || 0;
+        riverEdgeCountsByTile.set(tileId, currentCount + 1);
+      }
+
+      // Add the edge to our path and update state for the next iteration.
+      riverPath.push(edgeId);
+      previousVertex = currentVertex;
+      visitedVertices.add(nextVertex);
+      currentVertex = nextVertex;
+    }
+
+    return { path: riverPath, endVertex: currentVertex };
+  }
+
+  /**
+   * Gets the three vertices that are adjacent to a given vertex.
+   * @param {string} vertexId The ID of the vertex to find neighbors for.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {string[]} An array of neighbor vertex IDs.
+   * @private
+   */
+  static _getNeighborVertices(vertexId, map) {
+    const neighborVertices = new Set();
+    const [t1, t2, t3] = HexGridUtils.getTilesForVertex(vertexId).map(c => map.getTileAt(c.x, c.y));
+
+    if (!t1 || !t2 || !t3) return [];
+
+    const findCommonNeighbor = (tileA, tileB, excludeTile) => {
+      const neighborsA = HexGridUtils.getNeighbors(tileA.x, tileA.y).map(c => map.getTileAt(c.x, c.y));
+      const neighborsBCoords = new Set(HexGridUtils.getNeighbors(tileB.x, tileB.y).map(c => `${c.x},${c.y}`));
+      return neighborsA.find(n => n && n !== excludeTile && neighborsBCoords.has(`${n.x},${n.y}`));
+    };
+
+    // Find the vertex "opposite" each of the three defining tiles.
+    const t4 = findCommonNeighbor(t2, t3, t1);
+    const v2 = HexGridUtils.getVertexIdFromTiles(t2, t3, t4);
+    if (v2) neighborVertices.add(v2);
+
+    const t5 = findCommonNeighbor(t1, t3, t2);
+    const v3 = HexGridUtils.getVertexIdFromTiles(t1, t3, t5);
+    if (v3) neighborVertices.add(v3);
+
+    const t6 = findCommonNeighbor(t1, t2, t3);
+    const v4 = HexGridUtils.getVertexIdFromTiles(t1, t2, t6);
+    if (v4) neighborVertices.add(v4);
+
+    return Array.from(neighborVertices);
+  }
+
+  /**
+   * Finds the vertex on the opposite side of a lake tile from an entry vertex.
+   * @param {string} entryVertexId The vertex where the river enters the lake area.
+   * @param {import('./HexTile.js').default} lakeTile The lake tile being crossed.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {string|null} The ID of the exit vertex, or null if none is found.
+   * @private
+   */
+  static _findOppositeVertex(entryVertexId, lakeTile, map) {
+    const entryCenter = HexGridUtils.getVertexCenterCube(entryVertexId, map);
+    if (!entryCenter) return null;
+
+    const lakeVertices = this._getVerticesForTile(lakeTile, map);
+    let bestExitVertex = null;
+    let maxDist = -1;
+
+    for (const vertexId of lakeVertices) {
+      const vertexCenter = HexGridUtils.getVertexCenterCube(vertexId, map);
+      if (vertexCenter) {
+        const dist = HexGridUtils.getCubeDistance(entryCenter, vertexCenter);
+        if (dist > maxDist) {
+          maxDist = dist;
+          bestExitVertex = vertexId;
+        }
+      }
+    }
+    return bestExitVertex;
+  }
+
+  /**
+   * Gets the two tiles that share a given edge.
+   * @param {string} edgeId The ID of the edge.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {Array<import('./HexTile.js').default>} An array containing the two tiles that border the edge.
+   * @private
+   */
+  static _getTilesForEdge(edgeId, map) {
+    const [vertexId1, vertexId2] = HexGridUtils.getVerticesForEdge(edgeId);
+    const v1TileCoords = HexGridUtils.getTilesForVertex(vertexId1);
+    const v2TileCoordsSet = new Set(HexGridUtils.getTilesForVertex(vertexId2).map(c => `${c.x},${c.y}`));
+
+    const commonCoords = v1TileCoords.filter(c => v2TileCoordsSet.has(`${c.x},${c.y}`));
+
+    return commonCoords.map(c => map.getTileAt(c.x, c.y)).filter(t => t !== null);
+  }
+
+  /**
+   * Removes any features (like forests or hills) from tiles that are lakes.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @private
+   */
+  static _removeFeaturesFromLakes(map) {
+    for (const tile of map.grid.flat()) {
+      if (tile.biome.id === BiomeLibrary.LAKE.id && tile.feature) {
+        tile.feature = null;
       }
     }
   }

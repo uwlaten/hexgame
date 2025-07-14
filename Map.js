@@ -33,6 +33,12 @@ export default class Map {
      * @type {HexTile[][]}
      */
     this.grid = [];
+
+    /**
+     * A set of unique string IDs for every hex edge that contains a river.
+     * @type {Set<string>}
+     */
+    this.rivers = new Set();
   }
 
   /**

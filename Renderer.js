@@ -1,7 +1,7 @@
 /**
  * @fileoverview Defines the Renderer class for drawing the game state onto a canvas.
  */
-
+import HexGridUtils from './HexGridUtils.js';
 import HexTile from './HexTile.js';
 import { Building } from './Building.js';
 import { BuildingLibrary } from './BuildingLibrary.js';
@@ -43,14 +43,22 @@ export default class Renderer {
   }
 
   /**
+   * Calculates the pixel coordinates of a tile's center.
+   * @param {HexTile} tile The tile to calculate coordinates for.
+   * @returns {{x: number, y: number}} The pixel coordinates of the tile's center.
+   */
+  tileToPixel(tile) {
+    const cx = this.hexSize * Math.sqrt(3) * (tile.x + 0.5 * (tile.y & 1));
+    const cy = this.hexSize * (3 / 2) * tile.y;
+    return { x: cx, y: cy };
+  }
+
+  /**
    * Draws a single hexagonal tile on the canvas.
    * @param {HexTile} tile The HexTile object to draw.
    */
   drawHexTile(tile) {
-    // Calculate the pixel center of the hex. This uses a "pointy-top" hexagon
-    // orientation with an "odd-r" horizontal layout (odd rows are shifted).
-    const cx = this.hexSize * Math.sqrt(3) * (tile.x + 0.5 * (tile.y & 1));
-    const cy = this.hexSize * (3 / 2) * tile.y;
+    const { x: cx, y: cy } = this.tileToPixel(tile);
 
     const color = tile.biome.color || '#cccccc'; // Use the color from the biome object.
 
@@ -222,6 +230,60 @@ export default class Renderer {
   }
 
   /**
+   * Calculates the pixel coordinates of a vertex by averaging its surrounding tile centers.
+   * @param {string} vertexId The unique ID of the vertex.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {{x: number, y: number}|null} The pixel coordinates, or null if invalid.
+   * @private
+   */
+  _getVertexPixelCoords(vertexId, map) {
+    const tileCoords = HexGridUtils.getTilesForVertex(vertexId);
+    if (tileCoords.length !== 3) return null;
+
+    let totalX = 0;
+    let totalY = 0;
+
+    for (const coord of tileCoords) {
+      const tile = map.getTileAt(coord.x, coord.y);
+      if (!tile) return null; // Vertex is partially off-map
+
+      const { x: px, y: py } = this.tileToPixel(tile);
+      totalX += px;
+      totalY += py;
+    }
+
+    return { x: totalX / 3, y: totalY / 3 };
+  }
+
+  /**
+   * Draws all the rivers stored in the map's river data set.
+   * @param {import('./Map.js').default} map The map object.
+   * @private
+   */
+  _drawRivers(map) {
+    if (map.rivers.size === 0) return;
+
+    this.ctx.strokeStyle = '#0064a7ff'; // A nice river blue, same as lakes
+    this.ctx.lineWidth = 4;
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+
+    for (const edgeId of map.rivers) {
+      const [vertexId1, vertexId2] = HexGridUtils.getVerticesForEdge(edgeId);
+
+      const p1 = this._getVertexPixelCoords(vertexId1, map);
+      const p2 = this._getVertexPixelCoords(vertexId2, map);
+
+      if (p1 && p2) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(p1.x, p1.y);
+        this.ctx.lineTo(p2.x, p2.y);
+        this.ctx.stroke();
+      }
+    }
+  }
+
+  /**
    * Clears the canvas and draws the entire map.
    * @param {import('./Map.js').default} map The map object to draw.
    */
@@ -244,6 +306,9 @@ export default class Renderer {
         this.drawHexTile(tile);
       }
     }
+
+    // Draw rivers on top of the tiles.
+    this._drawRivers(map);
 
     // Restore the context to its original state
     this.ctx.restore();

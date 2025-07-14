@@ -10,6 +10,7 @@ export const BiomeLibrary = {
     color: '#4f93a8',
     isBuildable: false,
     canSupportFeatures: false,
+    elevation: 0, // Lowest point
   },
   LAKE: {
     id: 'lake',
@@ -17,6 +18,7 @@ export const BiomeLibrary = {
     color: '#63b4cf',
     isBuildable: false,
     canSupportFeatures: false,
+    elevation: 1, // Above ocean, but low
   },
   ICE: {
     id: 'ice',
@@ -24,6 +26,7 @@ export const BiomeLibrary = {
     color: '#ffffff',
     isBuildable: false,
     canSupportFeatures: false,
+    elevation: 10, // Glacier - source of rivers.
   },
   MOUNTAIN: {
     id: 'mountain',
@@ -31,6 +34,7 @@ export const BiomeLibrary = {
     color: '#808080',
     isBuildable: false,
     canSupportFeatures: false,
+    elevation: 10, // Highest point
     draw: {
       type: 'shapes',
       strokeStyle: '#ffffffff', // LightGray for the peak symbols
@@ -49,6 +53,7 @@ export const BiomeLibrary = {
     name: 'Desert',
     color: '#d2b48c',
     isBuildable: true,
+    elevation: 2, // Standard land height
     climate: {
       temperature: ['hot', 'temperate'],
       moisture: ['dry'],
@@ -60,6 +65,7 @@ export const BiomeLibrary = {
     name: 'Grassland',
     color: '#98fb98',
     isBuildable: true,
+    elevation: 2, // Standard land height
     climate: {
       temperature: ['cold', 'temperate'],
       moisture: ['normal', 'wet'],
@@ -71,6 +77,7 @@ export const BiomeLibrary = {
     name: 'Savannah',
     color: '#f0e68c',
     isBuildable: true,
+    elevation: 2, // Standard land height
     climate: {
       temperature: ['temperate', 'hot'],
       moisture: ['dry', 'normal'],
@@ -83,6 +90,7 @@ export const BiomeLibrary = {
     name: 'Tundra',
     color: '#c4d3e3', // A slightly darker, less pure white than ice
     isBuildable: true,
+    elevation: 2, // Standard land height
     climate: {
       temperature: ['cold'],
       moisture: ['dry', 'normal', 'wet'], // Tundra can be boggy or dry

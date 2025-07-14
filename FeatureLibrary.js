@@ -7,6 +7,7 @@ export const FeatureLibrary = {
   HILLS: {
     id: 'hills',
     name: 'Hills',
+    elevationModifier: 2, // Hills add to the base elevation
     // The 'draw' property contains instructions for the Renderer.
     draw: {
       type: 'shapes', // Tells the renderer to interpret the 'shapes' array.
@@ -26,6 +27,7 @@ export const FeatureLibrary = {
   FOREST: {
     id: 'forest',
     name: 'Forest',
+    elevationModifier: 0, // Forests don't change the ground elevation
     draw: {
       type: 'shapes',
       shapes: [
