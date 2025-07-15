@@ -61,10 +61,10 @@ export default {
     forests: {
       // Base chance is the moisture level. These are multipliers.
       biomeMultipliers: {
-        tundra: 1,
-        savannah: 0.4,
-        grassland: 0.5,
-        desert: 0.1,
+        tundra: 1, // No change
+        steppe: 0.4, // Renamed from savannah
+        plains: 0.5, // Renamed from grassland
+        desert: 0.1, // No change
       },
       // A significant boost for desert tiles next to water to create oases.
       oasisMoistureBoost: 0.5,

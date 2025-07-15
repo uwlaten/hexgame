@@ -579,10 +579,10 @@ export default class MapGenerator {
    */
   static _fixProblematicBiomes(map, placeholderBiome) {
     const tilesToConvert = [];
-    const allTiles = map.grid.flat();
-    const tundraTiles = allTiles.filter(t => t.biome.id === BiomeLibrary.TUNDRA.id);
-    const desertTiles = allTiles.filter(t => t.biome.id === BiomeLibrary.DESERT.id);
-    const topTenPercentRow = Math.floor(map.height * 0.1);
+    const allTiles = map.grid.flat(); // All tiles on the map.
+    const tundraTiles = allTiles.filter(t => t.biome.id === BiomeLibrary.TUNDRA.id); // All tundra tiles.
+    const desertTiles = allTiles.filter(t => t.biome.id === BiomeLibrary.DESERT.id); // All desert tiles.
+    const topTenPercentRow = Math.floor(map.height * 0.1); // Row cutoff for "northern" tiles.
 
     // Rule 1: Check for deserts too close to tundra
     if (tundraTiles.length > 0 && desertTiles.length > 0) {
@@ -615,19 +615,18 @@ export default class MapGenerator {
     // Now, perform the conversions for all flagged tiles
     for (const tile of tilesToConvert) {
       const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
-      let savannahNeighbors = 0;
-      let grasslandNeighbors = 0;
+      let steppeNeighbors = 0; // Changed from savannahNeighbors
+      let plainsNeighbors = 0; // Changed from grasslandNeighbors
 
       for (const coord of neighbors) {
         const neighbor = map.getTileAt(coord.x, coord.y);
         if (neighbor?.biome.isBuildable) {
-          if (neighbor.biome.id === placeholderBiome.id) savannahNeighbors++;
-          if (neighbor.biome.id === BiomeLibrary.GRASSLAND.id) grasslandNeighbors++;
+          if (neighbor.biome.id === placeholderBiome.id) steppeNeighbors++; // Changed from savannahNeighbors
+          if (neighbor.biome.id === BiomeLibrary.PLAINS.id) plainsNeighbors++; // Changed from grasslandNeighbors
         }
       }
-
-      // Convert to the most common valid neighbor, defaulting to the placeholder biome.
-      tile.biome = (grasslandNeighbors > savannahNeighbors) ? BiomeLibrary.GRASSLAND : placeholderBiome;
+      // Convert to the most common valid neighbor. Tie goes to plains.
+      tile.biome = (plainsNeighbors >= steppeNeighbors) ? BiomeLibrary.PLAINS : placeholderBiome;
     }
   }
 
@@ -1437,7 +1436,7 @@ export default class MapGenerator {
         const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
         const biomeCounts = {};
         const validLandBiomes = new Set([
-          BiomeLibrary.SAVANNAH.id, BiomeLibrary.GRASSLAND.id, BiomeLibrary.DESERT.id, BiomeLibrary.TUNDRA.id,
+          BiomeLibrary.STEPPE.id, BiomeLibrary.GRASSLAND.id, BiomeLibrary.DESERT.id, BiomeLibrary.TUNDRA.id,
         ]);
 
         for (const coord of neighbors) {
@@ -1716,6 +1715,28 @@ export default class MapGenerator {
             }
           }
           if (!hasRiver) return false;
+          break;
+        }
+        case 'feature': {
+          // Checks for the presence or absence of a feature, and can check for a specific feature ID.
+          // e.g., { type: 'feature', id: 'hills' } or { type: 'feature', present: false }
+          const shouldBePresent = condition.present !== false; // Defaults to true
+          const actuallyHasFeature = !!tile.feature;
+
+          if (shouldBePresent) {
+            // We expect a feature to be present.
+            if (!actuallyHasFeature) return false;
+            // If an ID is specified, it must match.
+            if (condition.id && tile.feature.id !== condition.id) return false;
+          } else {
+            // We expect no feature to be present.
+            if (actuallyHasFeature) return false;
+          }
+          break;
+        }
+        case 'notAdjacentToResource': {
+          // This ensures a tile is not a candidate if it's already next to a resource.
+          if (this._isAdjacentToResource(tile, map)) return false;
           break;
         }
       }

@@ -43,8 +43,8 @@ export const FeatureLibrary = {
     // Override the default resources for specific biomes.
     resourceOverrides: {
       // When a forest is on these biomes, it produces no resources.
-      savannah: [],
-      desert: [],
+      steppe: [], // Renamed from savannah
+      desert: [], // No change
     },
     draw: {
       type: 'shapes',

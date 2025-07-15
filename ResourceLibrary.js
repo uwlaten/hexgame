@@ -80,4 +80,31 @@ export const ResourceLibrary = {
       ],
     },
   },
+  GOLD: {
+    id: 'Gold',
+    name: 'Gold',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', params: [0, 0, 0.45] },
+        // A simple trapezoid to represent a gold ingot.
+        { type: 'polygon', fillStyle: '#FFD700', strokeStyle: '#DAA520', lineWidth: 1, params: [ [-0.25, -0.2], [0.25, -0.2], [0.2, 0.2], [-0.2, 0.2] ] },
+      ],
+    },
+  },
+  CATTLE: {
+    id: 'Cattle',
+    name: 'Cattle',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'circle', fillStyle: 'rgba(255, 255, 255, 0.8)', params: [0, 0, 0.45] },
+        // A simple milk bottle shape.
+        { type: 'rect', fillStyle: '#F5F5F5', strokeStyle: '#BDBDBD', lineWidth: 1, params: [-0.15, -0.2, 0.3, 0.45] }, // Body of the bottle
+        { type: 'rect', fillStyle: '#E0E0E0', strokeStyle: '#BDBDBD', lineWidth: 1, params: [-0.15, -0.3, 0.3, 0.1] },  // Top/cap area
+      ],
+    },
+  },
 };

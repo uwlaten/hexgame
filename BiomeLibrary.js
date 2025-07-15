@@ -70,15 +70,27 @@ export const BiomeLibrary = {
       moisture: ['dry'],
     },
     canSupportFeatures: true,
+    possibleResources: [
+      {
+        resourceId: 'Gold',
+        chance: 0.1,
+        conditions: [
+          // Tile must have the 'hills' feature.
+          { type: 'feature', id: 'hills' },
+          // Tile must be adjacent to at least one mountain.
+          { type: 'neighbor', property: 'biome.id', value: 'mountain', operator: 'atLeast', count: 1 },
+        ],
+      },
+    ],
   },
-  GRASSLAND: {
-    id: 'grassland',
-    name: 'Grassland',
+  PLAINS: {
+    id: 'plains',
+    name: 'Plains',
     color: '#98fb98',
     isBuildable: true,
     elevation: 2, // Standard land height
     climate: {
-      temperature: ['cold', 'temperate'],
+      temperature: ['cold', 'temperate'], // Renamed from Grassland
       moisture: ['normal', 'wet'],
     },
     canSupportFeatures: true,
@@ -86,16 +98,16 @@ export const BiomeLibrary = {
       // A much higher chance for grain on fertile tiles next to a river.
       {
         resourceId: 'Grain',
-        chance: 0.4,
+        chance: 0.4, // Good spot for grain
         conditions: [{ type: 'adjacentToRiver' }],
       },
       // A base chance for grain to appear anywhere in grasslands.
       { resourceId: 'Grain', chance: 0.05 },
     ],
   },
-  SAVANNAH: {
-    id: 'savannah',
-    name: 'Savannah',
+  STEPPE: {
+    id: 'steppe',
+    name: 'Steppe',
     color: '#f0e68c',
     isBuildable: true,
     elevation: 2, // Standard land height
@@ -103,7 +115,20 @@ export const BiomeLibrary = {
       temperature: ['temperate', 'hot'],
       moisture: ['dry', 'normal'],
     },
+    // Renamed from Savannah
     canSupportFeatures: true,
+    possibleResources: [
+      {
+        resourceId: 'Cattle',
+        chance: 0.3,
+        conditions: [
+          // Tile must not have any feature on it.
+          { type: 'feature', present: false },
+          // Tile must not be adjacent to an existing resource.
+          { type: 'notAdjacentToResource' },
+        ],
+      },
+    ],
     isDefaultPlaceholder: true, // This is the default land biome before climate is applied.
   },
   TUNDRA: {

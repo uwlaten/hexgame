@@ -31,7 +31,7 @@ export class ScoringRule {
 /**
  * A specific scoring rule that awards points for placing a Residence on a Savannah tile.
  */
-export class ResidenceOnSavannahRule extends ScoringRule {
+export class ResidenceOnSteppeRule extends ScoringRule {
   /**
    * Awards 1 point if a Residence is on a Savannah tile.
    * @override
@@ -40,9 +40,9 @@ export class ResidenceOnSavannahRule extends ScoringRule {
    */
   evaluate(tile) {
     const isResidence = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RESIDENCE.id;
-    const isSavannah = tile.biome.id === BiomeLibrary.SAVANNAH.id;
+    const isSteppe = tile.biome.id === BiomeLibrary.STEPPE.id;
 
-    if (isResidence && isSavannah) {
+    if (isResidence && isSteppe) {
       return 1;
     }
     return 0;

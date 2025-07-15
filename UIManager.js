@@ -270,7 +270,7 @@ export default class UIManager {
     if (!tileId) return;
 
     const hexSize = Config.UIConfig.nextTileDisplay.hexSize;
-    const cx = canvas.width / 2;
+    const cx = canvas.width / 2;  
     const cy = canvas.height / 2;
 
     // Draw a generic background tile for the icon.
