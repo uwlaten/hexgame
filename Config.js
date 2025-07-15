@@ -59,15 +59,63 @@ export default {
       isolatedHillChance: 0.05,
     },
     forests: {
-      // Base chance is the moisture level. These are multipliers.
-      biomeMultipliers: {
-        tundra: 1, // No change
-        steppe: 0.4, // Renamed from savannah
-        plains: 0.5, // Renamed from grassland
-        desert: 0.1, // No change
+      // Rules for forest placement, checked in order. The first matching rule wins.
+      biomeRules: {
+        // Default rule: all biomes have a base chance of forests based on moisture.
+        default: [{
+          multiplier: 1.0, // Apply the default moisture value as the chance.
+        }],
+        // Plains have a higher chance of forests, especially near rivers.
+        plains: [
+          {
+            conditions: [{ type: 'adjacentToRiver' }],
+            multiplier: 0.5, // Increase the moisture value for tiles next to rivers.
+          },
+          {
+            multiplier: 0.3, // Otherwise, apply a slightly reduced moisture value.
+          },
+        ],
+        // Steppe only has forests near freshwater (rivers or lakes).
+        steppe: [
+          {
+            conditions: [{ type: 'adjacentToRiver' }],
+            multiplier: 0.6, // Allow forests in riparian zones.
+          },
+          {
+            conditions: [{ type: 'neighbor', property: 'biome.id', value: 'lake', operator: 'atLeast', count: 1 }],
+            multiplier: 0.7, // Allow forests on lakeshores.
+          },
+          {
+            multiplier: 0.05, // Forbid forests on all other steppe tiles.
+          },
+        ],
+        // Tundra retains its normal moisture value as the chance.
+        tundra: [{
+          multiplier: 1.0, // Apply the default moisture value as the chance.
+        }],
+        // Deserts have a very low chance of forests, but oases get a boost.
+        desert: [
+          {
+            conditions: [{ type: 'adjacentToRiver' }],
+            boost: 0.5, // Add 0.5 to moisture for oases along rivers.
+          },
+          {
+            conditions: [{ type: 'neighbor', property: 'biome.id', value: 'lake', operator: 'atLeast', count: 1 }],
+            boost: 0.5, // Add 0.5 to moisture for oases on lakeshores.
+          },
+          {
+            conditions: [{ type: 'neighbor', property: 'feature.id', value: 'oasis', operator: 'atLeast', count: 1 }],
+            boost: 0.5, // Add 0.5 to moisture for oases near Oasis features.
+          },
+          {
+            conditions: [{ type: 'neighbor', property: 'biome.id', value: 'plains', operator: 'atLeast', count: 2 }],
+            multiplier: 0.2, // Small chance for forests on desert tiles bordering a significant plains area.
+          },
+          {
+            multiplier: 0, // Reduce the moisture value to 10% for other desert tiles.
+          },
+        ],
       },
-      // A significant boost for desert tiles next to water to create oases.
-      oasisMoistureBoost: 0.5,
     },
     rivers: {
       numRivers: { min: 2, max: 4 },
@@ -82,6 +130,12 @@ export default {
       maxAttemptsPerRiver: 10, // Prevents infinite loops if no good sources are left.
       maxDepth: 150, // Safety break for river pathfinding recursion.
     },
+    /**
+     * The chance (0-1) for an oasis to spawn on a valid desert tile.
+     */
+    oasisSpawnChance: .2,
+    // The threshold (0-1) for a desert tile to be considered "low elevation" for oasis placement.
+    oasisLowElevationThreshold: .5,
   },
 
   /**
@@ -131,6 +185,8 @@ export default {
       width: 60,
       height: 60,
       hexSize: 25,
-    },
+    }
   },
+
+
 };

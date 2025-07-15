@@ -96,16 +96,19 @@ export default class MapGenerator {
     // 7. Add detail features like hills.
     this._generateHills(map, finalElevationMap);
 
-    // 8. Add forests based on climate.
-    this._generateForests(map, moistureMap);
-
-    // 9. Generate rivers.
+    // 8. Generate rivers.
     this._generateRivers(map, log);
 
-    // 10. Run final post-processing passes to clean up the map.
+    // 9. Run final post-processing passes to clean up the map.
     this._runPostProcessingPasses(map, placeholderBiome);
 
-    // 11. Place resources on the now-finalized map.
+    // 10. Add special features like Oases that depend on the final map state.
+    this._generateOases(map, finalElevationMap);
+
+    // 11. Add forests based on the finalized map state (climate and hydrology).
+    this._generateForests(map, moistureMap);
+
+    // 12. Place resources on the now-finalized map.
     this._generateResources(map, log);
 
     // --- Final Log Summary ---
@@ -660,39 +663,98 @@ export default class MapGenerator {
    * @private
    */
   static _generateForests(map, moistureMap) {
-    const config = Config.MapGeneratorConfig.forests;
+    const forestConfig = Config.MapGeneratorConfig.forests;
 
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const tile = map.getTileAt(x, y);
 
-        // Skip if the tile cannot support features or already has one.
-        if (!tile.biome.canSupportFeatures || tile.feature) {
-          continue;
-        }
+        // Skip if the tile cannot support features or already has one, or is water.
+        if (!tile.biome.canSupportFeatures || tile.feature || tile.biome.id === BiomeLibrary.OCEAN.id || tile.biome.id === BiomeLibrary.LAKE.id) continue;
 
-        let chance = moistureMap[y][x];
+        let forestChance = moistureMap[y][x]; // Start with the base moisture value
         const biomeId = tile.biome.id;
+        const rulesForBiome = forestConfig.biomeRules[biomeId] || forestConfig.biomeRules.default;
 
-        // Apply biome-specific multipliers.
-        if (config.biomeMultipliers[biomeId]) {
-          chance *= config.biomeMultipliers[biomeId];
-        }
-
-        // Check for the "oasis" rule on desert tiles.
-        if (biomeId === BiomeLibrary.DESERT.id) {
-          const isAdjacentToWater = HexGridUtils.getNeighbors(x, y).some(c => {
-            const neighbor = map.getTileAt(c.x, c.y);
-            return neighbor && (neighbor.biome.id === BiomeLibrary.OCEAN.id || neighbor.biome.id === BiomeLibrary.LAKE.id);
-          });
-          if (isAdjacentToWater) {
-            chance += config.oasisMoistureBoost;
+        // Iterate through the rules for this biome and apply the first one that matches.
+        for (const rule of rulesForBiome) {
+          if (!rule.conditions || this._checkConditions(tile, rule.conditions, map)) {
+            if (rule.multiplier !== undefined) {
+              forestChance *= rule.multiplier;
+            }
+            if (rule.boost !== undefined) {
+              forestChance = Math.min(1, forestChance + rule.boost); // Ensure boost doesn't exceed 1.0
+            }
+            break; // Apply only the first matching rule.
           }
         }
 
-        if (Math.random() < chance) {
+        // Apply the chance to place a forest.
+        if (Math.random() < forestChance) {
+          // If it passes the random check, place a forest.
           tile.feature = FeatureLibrary.FOREST;
         }
+        // Otherwise, it remains as the base biome.
+        else {
+          // If a forest is not placed, this tile will remain its base biome
+          // This else block is intentionally left empty for clarity.
+        }
+      }
+    }
+  }
+
+  /**
+   * Places Oasis features on the map according to specific rules.
+   * @param {import('./Map.js').default} map The map object to modify.
+   * @param {number[][]} finalElevationMap The final elevation map data.
+   * @private
+   */
+  static _generateOases(map, finalElevationMap) {
+    // Get all desert tiles to determine the elevation threshold within deserts only.
+    const desertTiles = map.grid.flat().filter(tile => tile.biome.id === BiomeLibrary.DESERT.id);
+    if (desertTiles.length === 0) return;
+
+    // Determine the elevation threshold for what counts as "low-lying".
+    // We'll consider the bottom 20% of desert elevations as low.
+    const desertElevations = desertTiles.map(tile => finalElevationMap[tile.y][tile.x]).sort((a, b) => a - b);
+    const lowElevationThreshold = desertElevations[Math.min(desertElevations.length - 1, Math.floor(desertElevations.length * Config.MapGeneratorConfig.oasisLowElevationThreshold))];
+    const oasisSpawnChance = Config.MapGeneratorConfig.oasisSpawnChance;
+
+    for (const tile of map.grid.flat()) {
+      // --- Filter for candidate tiles ---
+      // Rule: Must be a desert tile.
+      if (tile.biome.id !== BiomeLibrary.DESERT.id) continue;
+      // Rule: Must not already have a feature.
+      if (tile.feature) continue;
+      // Rule: Must be a low-elevation tile.
+      if (finalElevationMap[tile.y][tile.x] > lowElevationThreshold) continue;
+
+      // --- Check adjacency rules ---
+      // Rule: Must not be adjacent to a major water body (Ocean or Lake).
+      const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+      const isNextToMajorWater = neighbors.some(n => n.biome.id === BiomeLibrary.OCEAN.id || n.biome.id === BiomeLibrary.LAKE.id);
+      if (isNextToMajorWater) continue;
+
+      // Rule: Must not have a river flowing along its edge.
+      const vertices = this._getVerticesForTile(tile, map);
+      let hasRiver = false;
+      for (let i = 0; i < vertices.length; i++) {
+        const edgeId = HexGridUtils.getEdgeId(vertices[i], vertices[(i + 1) % vertices.length]);
+        if (map.rivers.has(edgeId)) {
+          hasRiver = true;
+          break;
+        }
+      }
+      if (hasRiver) continue;
+
+      // If all rules pass, roll the dice for a chance to spawn.
+      const isNextToOasis = neighbors.some(n => n.feature?.id === FeatureLibrary.OASIS.id);
+      if (isNextToOasis) {
+        continue;
+      }
+
+      if (Math.random() < oasisSpawnChance) {
+        tile.feature = FeatureLibrary.OASIS;
       }
     }
   }
@@ -1436,7 +1498,7 @@ export default class MapGenerator {
         const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
         const biomeCounts = {};
         const validLandBiomes = new Set([
-          BiomeLibrary.STEPPE.id, BiomeLibrary.GRASSLAND.id, BiomeLibrary.DESERT.id, BiomeLibrary.TUNDRA.id,
+          BiomeLibrary.STEPPE.id, BiomeLibrary.PLAINS.id, BiomeLibrary.DESERT.id, BiomeLibrary.TUNDRA.id,
         ]);
 
         for (const coord of neighbors) {
@@ -1707,8 +1769,9 @@ export default class MapGenerator {
         case 'adjacentToRiver': {
           const vertices = this._getVerticesForTile(tile, map);
           let hasRiver = false;
-          for (let i = 0; i < 6; i++) {
-            const edgeId = HexGridUtils.getEdgeId(vertices[i], vertices[(i + 1) % 6]);
+          // Loop correctly over the actual number of vertices, which may be less than 6 for edge tiles.
+          for (let i = 0; i < vertices.length; i++) {
+            const edgeId = HexGridUtils.getEdgeId(vertices[i], vertices[(i + 1) % vertices.length]);
             if (map.rivers.has(edgeId)) {
               hasRiver = true;
               break;
@@ -1737,6 +1800,12 @@ export default class MapGenerator {
         case 'notAdjacentToResource': {
           // This ensures a tile is not a candidate if it's already next to a resource.
           if (this._isAdjacentToResource(tile, map)) return false;
+          break;
+        }
+        case 'adjacentToWater': {
+          const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+          const isNextToWaterBody = neighbors.some(n => n.biome.id === BiomeLibrary.LAKE.id || n.biome.id === BiomeLibrary.OCEAN.id || n.feature?.id === FeatureLibrary.OASIS.id);
+          if (!isNextToWaterBody) return false; // Condition fails if not next to a water biome.
           break;
         }
       }

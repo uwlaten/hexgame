@@ -74,4 +74,27 @@ export const FeatureLibrary = {
       resourceIds: ['*'], // '*' is a wildcard for all resources.
     },
   },
+  OASIS: {
+    id: 'oasis',
+    name: 'Oasis',
+    elevationModifier: 0, // An oasis is flat, it doesn't change tile elevation.
+    biomeResourceInteraction: {
+      mode: 'block',
+      resourceIds: ['*'], // An oasis prevents underlying biome resources (like Gold from Desert) from spawning.
+    },
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // A simple, stylized bean/pond shape to represent the water source.
+        {
+          type: 'polygon',
+          fillStyle: '#63b4cf', // A pleasant blue, similar to Lake color
+          strokeStyle: '#4f93a8', // A darker blue for the border
+          lineWidth: 2,
+          params: [ [-0.4, 0.2], [-0.2, -0.2], [0.2, -0.25], [0.45, 0.0], [0.3, 0.25], [0.0, 0.2] ],
+        },
+      ],
+    },
+  },
 };
