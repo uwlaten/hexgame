@@ -41,6 +41,8 @@ export default class UIManager {
     this.nextTileLabel = null;
     this.nextTileCanvas = null;
     this.nextTileCtx = null;
+    this.seedInput = null;
+    this.randomSeedButton = null;
   }
 
   /**
@@ -48,6 +50,7 @@ export default class UIManager {
    */
   init() {
     this._createConfigSliders();
+    this._createSeedInput();
     this._createNewGameButton();
     this._createScoreDisplay();
     this._createNextTileDisplay();
@@ -159,6 +162,50 @@ export default class UIManager {
   }
 
   /**
+   * Creates the seed input field and randomizer button.
+   * @private
+   */
+  _createSeedInput() {
+    const seedContainer = document.createElement('div');
+    seedContainer.className = 'input-control';
+
+    const seedLabel = document.createElement('label');
+    seedLabel.htmlFor = 'seed-input';
+    seedLabel.textContent = 'Seed:';
+
+    // Create a wrapper to group the text input and button for flexbox layout.
+    // This allows us to control their relative widths precisely.
+    const inputWrapper = document.createElement('div');
+    inputWrapper.style.display = 'flex';
+    inputWrapper.style.flexGrow = '1'; // Allows the wrapper to fill available space
+
+    this.seedInput = document.createElement('input');
+    this.seedInput.type = 'text';
+    this.seedInput.id = 'seed-input';
+    this.seedInput.placeholder = 'Leave blank for random';
+    this.seedInput.style.width = '75%'; // Occupy the majority of the space
+    this.seedInput.style.boxSizing = 'border-box';
+
+    this.randomSeedButton = document.createElement('button');
+    this.randomSeedButton.id = 'random-seed-button';
+    this.randomSeedButton.textContent = 'Random';
+    this.randomSeedButton.style.width = '25%'; // The button's width is ~33% of the input's
+    this.randomSeedButton.style.fontSize = '0.8em'; // Reduce font size
+    this.randomSeedButton.style.padding = '0.2em';
+    this.randomSeedButton.style.boxSizing = 'border-box';
+    this.randomSeedButton.style.marginLeft = '4px';
+
+    // Add event listener to the "Random" button to generate a new seed.
+    this.randomSeedButton.addEventListener('click', () => {
+      this.seedInput.value = Math.random().toString(36).substring(2, 15);
+    });
+
+    inputWrapper.append(this.seedInput, this.randomSeedButton);
+    seedContainer.append(seedLabel, inputWrapper);
+    this.configPanelContainer.appendChild(seedContainer);
+  }
+
+  /**
    * Creates the "New Game" button and attaches its event listener.
    * @private
    */
@@ -181,8 +228,9 @@ export default class UIManager {
     const temperature = tempValues[this.temperatureSlider.value];
     const waterLevel = parseInt(this.waterSlider.value, 10);
     const mapSize = parseInt(this.mapSizeSlider.value, 10);
+    const seed = this.seedInput.value.trim() || null;
 
-    return { waterLevel, temperature, mapSize };
+    return { waterLevel, temperature, mapSize, seed };
   }
 
   /**

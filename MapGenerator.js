@@ -18,6 +18,9 @@ import { createNoise2D } from 'https://cdn.skypack.dev/simplex-noise';
  * an instance of the generator itself, making it a lightweight helper.
  */
 export default class MapGenerator {
+  // Seed to allow map regeneration.  If null, a new seed is generated.
+  static seed = null;
+
   /**
    * Populates the provided map object's grid with HexTiles.
    * This method modifies the map object directly.
@@ -46,10 +49,29 @@ export default class MapGenerator {
       return ['Error: No default placeholder biome found.'];
     }
 
-    const noise2D = createNoise2D();
+ // Initialize the seed and PRNG. If no seed is provided, create a random one.
+    // This ensures every map is reproducible.
+    this.seed = options.seed || Math.random().toString(36).substring(2, 15);
+    log.push(`Using seed: ${this.seed}`);
+
+    // Create a deterministic pseudo-random number generator (PRNG) based on the seed.
+    // This Mulberry32 implementation is simple and effective for this purpose.
+    let seedNum = 0;
+    for (let i = 0; i < this.seed.length; i++) {
+        seedNum = (seedNum << 5) - seedNum + this.seed.charCodeAt(i);
+        seedNum |= 0; // Convert to 32bit integer
+    }
+    const prng = () => {
+      let t = seedNum += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+
+    const noise2D = createNoise2D(prng);
     const noiseScale = Config.MapGeneratorConfig.baseElevationNoiseScale;
 
-    // 1. Generate a base elevation map using simplex noise.
+      // 1. Generate a base elevation map using simplex noise.
     const elevationMap = [];
     for (let y = 0; y < map.height; y++) {
       const row = [];
@@ -64,7 +86,7 @@ export default class MapGenerator {
     }
 
     // 2. Apply a gradient to the elevation map to form a central continent.
-    const finalElevationMap = this._applyEdgeControl(elevationMap, map.width, map.height, log);
+    const finalElevationMap = this._applyEdgeControl(elevationMap, map.width, map.height, log, prng);
 
     // 3. Determine the sea level threshold based on the desired water percentage.
     const allElevations = finalElevationMap.flat().sort((a, b) => a - b);
@@ -88,28 +110,28 @@ export default class MapGenerator {
     }
 
     // 5. Place mountain ranges and peaks on the land.
-    this._generateMountains(map, finalElevationMap, placeholderBiome, log);
+    this._generateMountains(map, finalElevationMap, placeholderBiome, log, prng);
 
     // 6. Determine climate and assign final biomes to land tiles.
-    const { moistureMap } = this._generateClimateAndBiomes(map, options, placeholderBiome, log);
+    const { moistureMap } = this._generateClimateAndBiomes(map, options, placeholderBiome, log, prng);
 
     // 7. Add detail features like hills.
-    this._generateHills(map, finalElevationMap);
+    this._generateHills(map, finalElevationMap, prng);
 
     // 8. Generate rivers.
-    this._generateRivers(map, log);
+    this._generateRivers(map, log, prng);
 
     // 9. Run final post-processing passes to clean up the map.
-    this._runPostProcessingPasses(map, placeholderBiome);
+    this._runPostProcessingPasses(map, placeholderBiome, prng);
 
     // 10. Add special features like Oases that depend on the final map state.
-    this._generateOases(map, finalElevationMap);
+    this._generateOases(map, finalElevationMap, prng);
 
     // 11. Add forests based on the finalized map state (climate and hydrology).
-    this._generateForests(map, moistureMap);
+    this._generateForests(map, moistureMap, prng);
 
     // 12. Place resources on the now-finalized map.
-    this._generateResources(map, log);
+    this._generateResources(map, log, prng);
 
     // --- Final Log Summary ---
     const totalTiles = map.width * map.height;
@@ -129,14 +151,14 @@ export default class MapGenerator {
    * @returns {number[][]} The modified elevation map.
    * @private
    */
-  static _applyEdgeControl(elevationMap, width, height, log) {
+  static _applyEdgeControl(elevationMap, width, height, log, prng) {
     const modifiedMap = [];
-    const numEdges = Math.random() < 0.5 ? 1 : 2; // 50% chance for 1 or 2 low edges
+    const numEdges = prng() < 0.5 ? 1 : 2; // 50% chance for 1 or 2 low edges
     const edges = ['top', 'bottom', 'left', 'right'];
 
     // Shuffle edges to pick random ones
     for (let i = edges.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(prng() * (i + 1));
       [edges[i], edges[j]] = [edges[j], edges[i]];
     }
     const lowEdges = edges.slice(0, numEdges);
@@ -187,7 +209,7 @@ export default class MapGenerator {
    * @param {string[]} log The log array to push messages to.
    * @private
    */
-  static _generateMountains(map, elevationMap, placeholderBiome, log) {
+  static _generateMountains(map, elevationMap, placeholderBiome, log, prng) {
     const config = Config.MapGeneratorConfig.mountains;
 
     const allLandTiles = this._getLandTiles(map);
@@ -218,20 +240,20 @@ export default class MapGenerator {
       }
     }
 
-    const numRanges = Math.floor(Math.random() * (config.numRanges.max - config.numRanges.min + 1)) + config.numRanges.min;
+    const numRanges = Math.floor(prng() * (config.numRanges.max - config.numRanges.min + 1)) + config.numRanges.min;
 
     for (let i = 0; i < numRanges; i++) {
-      const targetLength = config.rangeLengths[Math.floor(Math.random() * config.rangeLengths.length)];
+      const targetLength = config.rangeLengths[Math.floor(prng() * config.rangeLengths.length)];
 
-      const startInland = Math.random() < config.inlandStartChance;
+      const startInland = prng() < config.inlandStartChance;
       let startTilePool = (startInland && inlandTiles.length > 0) ? inlandTiles : coastalTiles;
       if (startTilePool.length === 0) startTilePool = inlandTiles.length > 0 ? inlandTiles : coastalTiles;
       if (startTilePool.length === 0) continue; // No valid start tiles
 
-      let currentTile = startTilePool[Math.floor(Math.random() * startTilePool.length)];
+      let currentTile = startTilePool[Math.floor(prng() * startTilePool.length)];
       if (!currentTile || currentTile.biome.id !== placeholderBiome.id) continue;
 
-      let direction = Math.floor(Math.random() * 6);
+      let direction = Math.floor(prng() * 6);
       const startTile = currentTile;
       const currentRangeTiles = new Set();
 
@@ -254,9 +276,9 @@ export default class MapGenerator {
         }
 
         // Create a "bulge" in the mountain range.
-        if (Math.random() < config.bulgeChance) {
+        if (prng() < config.bulgeChance) {
           const neighbors = HexGridUtils.getNeighbors(currentTile.x, currentTile.y);
-          const randomNeighborCoords = neighbors[Math.floor(Math.random() * neighbors.length)];
+          const randomNeighborCoords = neighbors[Math.floor(prng() * neighbors.length)];
           const bulgeTile = map.getTileAt(randomNeighborCoords.x, randomNeighborCoords.y);
           const bulgeTouchesOther = HexGridUtils.getNeighbors(randomNeighborCoords.x, randomNeighborCoords.y).some(c => {
             const key = `${c.x},${c.y}`;
@@ -312,7 +334,7 @@ export default class MapGenerator {
           weightedChoices.push({ direction: dir, weight });
         }
 
-        const choice = this._getWeightedRandomChoice(weightedChoices);
+        const choice = this._getWeightedRandomChoice(weightedChoices, prng);
         if (!choice) break; // Walker is blocked.
 
         direction = choice.direction;
@@ -384,13 +406,13 @@ export default class MapGenerator {
    * @returns {object|null} The selected choice object, or null if no choices are available.
    * @private
    */
-  static _getWeightedRandomChoice(choices) {
+  static _getWeightedRandomChoice(choices, prng) {
     if (!choices || choices.length === 0) return null;
 
     const totalWeight = choices.reduce((sum, choice) => sum + choice.weight, 0);
     if (totalWeight <= 0) return choices[0]; // Fallback if all weights are zero
 
-    let random = Math.random() * totalWeight;
+    let random = prng() * totalWeight;
 
     for (const choice of choices) {
       if (random < choice.weight) {
@@ -410,7 +432,7 @@ export default class MapGenerator {
    * @param {object} placeholderBiome The biome object used as the default land tile.
    * @private
    */
-  static _generateClimateAndBiomes(map, options, placeholderBiome, log) {
+  static _generateClimateAndBiomes(map, options, placeholderBiome, log, prng) {
     const config = Config.MapGeneratorConfig.climate;
 
     // --- 1. Generate Base Temperature Map (Top-to-bottom gradient) ---
@@ -475,7 +497,7 @@ export default class MapGenerator {
     }
 
     // --- 5. Generate Moisture Map with base noise ---
-    const moistureNoise2D = createNoise2D();
+    const moistureNoise2D = createNoise2D(prng);
     const moistureMap = [];
     for (let y = 0; y < map.height; y++) {
       const row = [];
@@ -516,7 +538,7 @@ export default class MapGenerator {
     }
 
     // --- 7. Generate Biome Noise Map for tie-breaking ---
-    const biomeNoise2D = createNoise2D();
+    const biomeNoise2D = createNoise2D(prng);
     const biomeNoiseMap = [];
     for (let y = 0; y < map.height; y++) {
       const row = [];
@@ -639,7 +661,7 @@ export default class MapGenerator {
    * @param {object} placeholderBiome The biome object used as the default land tile.
    * @private
    */
-  static _runPostProcessingPasses(map, placeholderBiome) {
+  static _runPostProcessingPasses(map, placeholderBiome, prng) {
     // Pass 1: Fix problematic biome placements (the original logic).
     this._fixProblematicBiomes(map, placeholderBiome);
 
@@ -653,7 +675,7 @@ export default class MapGenerator {
     this._removeFeaturesFromLakes(map);
 
     // Pass 5: Final sanity check to remove any lakes with rivers on their edges.
-    this._cleanupInvalidLakes(map, placeholderBiome);
+    this._cleanupInvalidLakes(map, placeholderBiome, prng);
   }
 
   /**
@@ -662,7 +684,7 @@ export default class MapGenerator {
    * @param {number[][]} moistureMap The final moisture map data.
    * @private
    */
-  static _generateForests(map, moistureMap) {
+  static _generateForests(map, moistureMap, prng) {
     const forestConfig = Config.MapGeneratorConfig.forests;
 
     for (let y = 0; y < map.height; y++) {
@@ -690,7 +712,7 @@ export default class MapGenerator {
         }
 
         // Apply the chance to place a forest.
-        if (Math.random() < forestChance) {
+        if (prng() < forestChance) {
           // If it passes the random check, place a forest.
           tile.feature = FeatureLibrary.FOREST;
         }
@@ -709,7 +731,7 @@ export default class MapGenerator {
    * @param {number[][]} finalElevationMap The final elevation map data.
    * @private
    */
-  static _generateOases(map, finalElevationMap) {
+  static _generateOases(map, finalElevationMap, prng) {
     // Get all desert tiles to determine the elevation threshold within deserts only.
     const desertTiles = map.grid.flat().filter(tile => tile.biome.id === BiomeLibrary.DESERT.id);
     if (desertTiles.length === 0) return;
@@ -753,7 +775,7 @@ export default class MapGenerator {
         continue;
       }
 
-      if (Math.random() < oasisSpawnChance) {
+      if (prng() < oasisSpawnChance) {
         tile.feature = FeatureLibrary.OASIS;
       }
     }
@@ -765,7 +787,7 @@ export default class MapGenerator {
    * @param {number[][]} elevationMap The final elevation map, used to place isolated hills.
    * @private
    */
-  static _generateHills(map, elevationMap) {
+  static _generateHills(map, elevationMap, prng) {
     const config = Config.MapGeneratorConfig.hills;
 
     // --- Proximity-Based Hills (Foothills) ---
@@ -795,7 +817,7 @@ export default class MapGenerator {
 
       const chance = config.adjacentToMountainChance - (distance - 1) * config.distanceFalloff;
 
-      if (Math.random() < chance) {
+      if (prng() < chance) {
         tile.feature = FeatureLibrary.HILLS;
 
         // If a hill is placed, add its neighbors to the queue to continue the spread.
@@ -820,7 +842,7 @@ export default class MapGenerator {
 
       // Ensure it's not adjacent to a mountain to keep it truly isolated.
       const isAdjacentToMountain = HexGridUtils.getNeighbors(tile.x, tile.y).some(c => map.getTileAt(c.x, c.y)?.biome.id === BiomeLibrary.MOUNTAIN.id);
-      if (!isAdjacentToMountain && Math.random() < config.isolatedHillChance) {
+      if (!isAdjacentToMountain && prng() < config.isolatedHillChance) {
         tile.feature = FeatureLibrary.HILLS;
       }
     }
@@ -977,7 +999,7 @@ export default class MapGenerator {
    * @param {string[]} log The log array to push messages to.
    * @private
    */
-  static _generateRivers(map, log) {
+  static _generateRivers(map, log, prng) {
     const config = Config.MapGeneratorConfig.rivers;
 
     // 1. Identify all potential source tiles on the map.
@@ -1000,7 +1022,7 @@ export default class MapGenerator {
     if (potentialSources.length === 0) return;
 
     // 2. Determine how many rivers to generate.
-    const numRiversToGenerate = Math.floor(Math.random() * (config.numRivers.max - config.numRivers.min + 1)) + config.numRivers.min;
+    const numRiversToGenerate = Math.floor(prng() * (config.numRivers.max - config.numRivers.min + 1)) + config.numRivers.min;
     log.push(`--- Attempting to generate ${numRiversToGenerate} Rivers ---`);
 
     let riversGenerated = 0;
@@ -1009,7 +1031,7 @@ export default class MapGenerator {
       for (let attempt = 0; attempt < config.maxAttemptsPerRiver; attempt++) {
         if (potentialSources.length === 0) break; // No more sources to try
 
-        const sourceChoice = this._getWeightedRandomChoice(potentialSources);
+        const sourceChoice = this._getWeightedRandomChoice(potentialSources, prng);
         if (!sourceChoice) continue;
 
         const sourceTile = sourceChoice.tile;
@@ -1021,7 +1043,7 @@ export default class MapGenerator {
           continue; // This source is unusable, try again.
         }
 
-        const startVertex = vertices[Math.floor(Math.random() * vertices.length)];
+        const startVertex = vertices[Math.floor(prng() * vertices.length)];
         const { path: riverPath, endVertex, formedLakeAt } = this._findRiverPathFromSource(startVertex, map, map.rivers);
 
         // --- New Validation: Check if the river ends too close to its source ---
@@ -1469,7 +1491,7 @@ export default class MapGenerator {
    * @param {object} placeholderBiome The biome object used as the default land tile.
    * @private
    */
-  static _cleanupInvalidLakes(map, placeholderBiome) {
+  static _cleanupInvalidLakes(map, placeholderBiome, prng) {
     const lakesToConvert = [];
     const lakeTiles = map.grid.flat().filter(t => t.biome.id === BiomeLibrary.LAKE.id);
 
@@ -1520,7 +1542,7 @@ export default class MapGenerator {
               majorityBiomes.push(biomeId);
             }
           }
-          const chosenBiomeId = majorityBiomes[Math.floor(Math.random() * majorityBiomes.length)];
+          const chosenBiomeId = majorityBiomes[Math.floor(prng() * majorityBiomes.length)];
           const newBiome = Object.values(BiomeLibrary).find(b => b.id === chosenBiomeId);
           tile.biome = newBiome;
         } else {
@@ -1536,9 +1558,9 @@ export default class MapGenerator {
    * @param {string[]} log The log array to push messages to.
    * @private
    */
-  static _generateResources(map, log) {
+  static _generateResources(map, log, prng) {
     // 1. Determine how many of each resource to spawn.
-    const targetCounts = this._determineResourceTargetCounts();
+    const targetCounts = this._determineResourceTargetCounts(prng);
     log.push(`Target resource counts: ${JSON.stringify(targetCounts)}`);
 
     // 2. Create and shuffle the master list of all resource instances to place.
@@ -1548,13 +1570,13 @@ export default class MapGenerator {
         masterPlacementList.push(resourceId);
       }
     }
-    this._shuffleArray(masterPlacementList);
+    this._shuffleArray(masterPlacementList, prng);
 
     // 3. Loop through the shuffled list and place each instance.
     const finalResourceCounts = {};
     for (const resourceId of masterPlacementList) {
       const candidateTiers = this._getRankedCandidateTiers(resourceId, map);
-      const placed = this._placeSingleResourceInstance(resourceId, candidateTiers, map);
+      const placed = this._placeSingleResourceInstance(resourceId, candidateTiers, map, prng);
       if (placed) {
         finalResourceCounts[resourceId] = (finalResourceCounts[resourceId] || 0) + 1;
       }
@@ -1579,12 +1601,12 @@ export default class MapGenerator {
    * @returns {Object.<string, number>} A map of resource IDs to their target counts.
    * @private
    */
-  static _determineResourceTargetCounts() {
+  static _determineResourceTargetCounts(prng) {
     const counts = {};
     for (const key in ResourceLibrary) {
       const resourceId = ResourceLibrary[key].id;
       // For each resource, decide to spawn between 1 and 3 instances.
-      counts[resourceId] = Math.floor(Math.random() * 3) + 1;
+      counts[resourceId] = Math.floor(prng() * 3) + 1;
     }
     return counts;
   }
@@ -1594,9 +1616,9 @@ export default class MapGenerator {
    * @param {Array} array The array to shuffle.
    * @private
    */
-  static _shuffleArray(array) {
+  static _shuffleArray(array, prng) {
     for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(prng() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
     }
   }
@@ -1653,7 +1675,7 @@ export default class MapGenerator {
    * @returns {boolean} True if the resource was successfully placed, false otherwise.
    * @private
    */
-  static _placeSingleResourceInstance(resourceId, candidateTiers, map) {
+  static _placeSingleResourceInstance(resourceId, candidateTiers, map, prng) {
     // Define the probabilities for selecting from each tier.
     const tierProbabilities = {
       tier1: 0.70, // 70% chance to pick from the best locations
@@ -1661,7 +1683,7 @@ export default class MapGenerator {
       tier3: 0.05, // 5% chance to pick from acceptable locations
     };
 
-    const rand = Math.random();
+    const rand = prng();
     let chosenTierName;
 
     if (rand < tierProbabilities.tier1) {
@@ -1680,7 +1702,7 @@ export default class MapGenerator {
       const candidates = candidateTiers[tierName];
       if (candidates && candidates.length > 0) {
         // Shuffle the chosen tier to randomize placement among equally-good candidates.
-        this._shuffleArray(candidates);
+        this._shuffleArray(candidates, prng);
 
         for (const tile of candidates) {
           // Final validation: ensure the tile is still empty and not adjacent to another resource.
