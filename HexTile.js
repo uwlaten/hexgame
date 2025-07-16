@@ -18,8 +18,9 @@ export default class HexTile {
    * @param {object} biome The biome object for this tile, from BiomeLibrary.
    * @param {object|null} [feature=null] A feature object on the tile, from FeatureLibrary. Defaults to null.
    * @param {Building|object|null} [initialContent=null] Any initial content on the tile (Building instance or Resource definition). Defaults to null.
+   * @param {import('./Map.js').default} map The map object this tile belongs to.
    */
-  constructor(x, y, biome, feature = null, initialContent = null) {
+   constructor(x, y, biome, feature = null, initialContent = null, map = null) {
     /**
      * The horizontal position of the tile in the grid.
      * @type {number}
@@ -52,6 +53,12 @@ export default class HexTile {
      */
     this.contentType = null;
 
+    /**
+     * A reference to the map object that contains this tile.
+     * @type {import('./Map.js').default|null}
+     */
+    this.map = map; // Store the map reference
+
     this.setContent(initialContent);
   }
 
@@ -76,5 +83,15 @@ export default class HexTile {
    */
   clearContent() {
     this.contentType = null;
+  }
+
+  /**
+   * Creates a deep copy of this tile.
+   * This is crucial for hypothetical calculations without modifying the original game state.
+   * @returns {HexTile} A new HexTile instance that is a copy of this one.
+   */
+  clone() {
+    // The constructor handles all properties correctly, including setting the content.
+    return new HexTile(this.x, this.y, this.biome, this.feature, this.contentType, this.map);
   }
 }

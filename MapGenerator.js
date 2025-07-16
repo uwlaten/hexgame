@@ -81,7 +81,7 @@ export default class MapGenerator {
       for (let x = 0; x < map.width; x++) {
         const elevation = finalElevationMap[y][x];
         const biome = elevation < seaLevelThreshold ? BiomeLibrary.OCEAN : placeholderBiome;
-        const tile = new HexTile(x, y, biome);
+        const tile = new HexTile(x, y, biome, null, null, map); // Pass the map reference here.
         row.push(tile);
       }
       map.grid.push(row);
@@ -1686,7 +1686,8 @@ export default class MapGenerator {
           // Final validation: ensure the tile is still empty and not adjacent to another resource.
           if (!tile.contentType && !this._isAdjacentToResource(tile, map)) {
             const resourceDef = ResourceLibrary[resourceId.toUpperCase()];
-            if (resourceDef) {
+            if (resourceDef) {              
+              // Place a *copy* of the resource, not the original definition.
               tile.setContent(resourceDef);
               return true; // Successfully placed.
             }

@@ -20,32 +20,52 @@ export default class Player {
      */
     this.score = 0;
 
-    /**
-     * The collection of building types the player can draw from.
-     * @type {string[]}
-     */
-    this.deck = this._getInitialDeck();
+    this.cityCentrePlaced = false;
+    this.hand = Config.PlayerConfig.initialHand[0]; // Start with the City Centre.
 
-    /**
-     * The type of tile the player currently has selected to place on the map.
-     * @type {string|null} This should be an ID from the BuildingLibrary.
-     */
-    this.currentTileInHand = null;
+    this.deck = []; // The main deck is initially empty.
+    this.deckSize = Config.PlayerConfig.initialDeckSize;
 
-    this.drawNewTile();
+    // The type of tile the player currently has selected to place on the map.
+    this.currentTileInHand = this.hand;
 
     // Announce the initial score so the UI can display it.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+  }
+  
+  _generateDeck() {
+    const deck = [];
+    for (const [buildingId, count] of Object.entries(Config.PlayerConfig.mainDeck)) {
+      for (let i = 0; i < count; i++) {
+        deck.push(buildingId);
+      }
+    }
+    return this._shuffleArray(deck);
+  }
+
+  _shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
   }
 
   /**
    * Resets the player's state to the beginning of a new game.
    */
   reset() {
+    // Mirror the initial state from the constructor.
     this.score = 0;
-    this.deck = this._getInitialDeck();
-    this.drawNewTile(); // This will emit hand and score updates
+    this.cityCentrePlaced = false;
+    this.hand = Config.PlayerConfig.initialHand[0];
+    this.deck = [];
+    this.currentTileInHand = this.hand;
+
+    // Announce the reset state to the UI.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
   }
 
   /**
@@ -53,25 +73,17 @@ export default class Player {
    * Emits a PLAYER_TILE_HAND_UPDATED event.
    */
   drawNewTile() {
-    if (this.deck.length > 0) {
-      const randomIndex = Math.floor(Math.random() * this.deck.length);
-      const [drawnTile] = this.deck.splice(randomIndex, 1);
-      this.currentTileInHand = drawnTile;
+    if (!this.cityCentrePlaced) {
+      // City Centre not placed yet, no drawing from the main deck.
+      this.currentTileInHand = this.hand;
+    } else if (this.deck.length > 0) {
+      // Main deck exists and has tiles: draw one.
+      this.currentTileInHand = this.deck.pop(); // Draw from the end (more efficient).
     } else {
+      // Main deck is empty.
       console.warn('Player deck is empty. Cannot draw a new tile.');
       this.currentTileInHand = null;
     }
-
     this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
-  }
-
-  /**
-   * Returns the initial set of cards for the player's deck.
-   * @returns {string[]}
-   * @private
-   */
-  _getInitialDeck() {
-    // Return a copy to prevent mutation of the original config array.
-    return [...Config.PlayerConfig.initialDeck];
   }
 }

@@ -8,9 +8,8 @@ import {
   BasePlacementScore,
   MineScoringRule, IronMineScoringRule, QuarryScoringRule,
   PollutedSlumScoringRule, HilltopVillaScoringRule, RiverfrontHomeScoringRule, LuxuryHomeScoringRule,
-  BridgeScoringRule 
+  BridgeScoringRule, ResidenceOnSteppeRule
 } from './ScoringRules.js';
-import EventEmitter from './EventEmitter.js';
 
 /**
  * The ScoringEngine is responsible for calculating score changes based on game events.
@@ -33,12 +32,12 @@ export default class ScoringEngine {
      */
     this.rules = [];
     this._registerCoreRules();
-    
   }
 
   _registerCoreRules() {
 
     // Initialize the engine with the registered rules.
+    this.addRule(new ResidenceOnSteppeRule());
     this.addRule(new BasePlacementScore());
     this.addRule(new MineScoringRule());
     this.addRule(new IronMineScoringRule());
@@ -61,7 +60,26 @@ export default class ScoringEngine {
    * Registers a new scoring rule with the engine.
    * @param {import('./ScoringRules.js').ScoringRule} rule An instance of a class that extends ScoringRule.
    */
-  addRule(rule) { this.rules.push(rule); }
+  addRule(rule) {
+    this.rules.push(rule);
+  }
+
+  /**
+   * Registers a new scoring rule with the engine.
+   * Registers a new scoring rule with the engine.
+   * @param {import('./ScoringRules.js').ScoringRule} rule An instance of a class that extends ScoringRule.
+   */
+  addRule(rule) {
+    this.rules.push(rule);
+  }
+
+  /**
+   * Initializes the engine by subscribing to relevant game events.
+   */
+  init() {
+    // This will listen for a new, more specific event that we will create in the next step.
+    this.eventEmitter.on('BUILDING_PLACED', this._handleBuildingPlaced.bind(this));
+  }
 
   /**
    * Calculates the potential score for placing a building on a given tile.
@@ -74,7 +92,20 @@ export default class ScoringEngine {
   static calculateScoreFor(buildingId, tile, map){
     // In this static version, we create a temporary ScoringEngine with the registered rules,
     // but without a player to update. We then use it to evaluate the score.
-    const tempEngine = new ScoringEngine(new EventEmitter(), null); // Temporary emitter, no player
+    const tempEngine = new ScoringEngine(null, null); // No emitter or player needed
+    // The real game registers rules at startup, so we need to do the same here.
+    // For now, we'll hard-code the rules, but this will eventually be dynamic.
+    tempEngine.addRule(new ResidenceOnSteppeRule());
+    tempEngine.addRule(new BasePlacementScore());
+    tempEngine.addRule(new MineScoringRule());
+    tempEngine.addRule(new IronMineScoringRule());
+    tempEngine.addRule(new QuarryScoringRule());
+    tempEngine.addRule(new PollutedSlumScoringRule());
+    tempEngine.addRule(new HilltopVillaScoringRule());
+    tempEngine.addRule(new RiverfrontHomeScoringRule());
+    tempEngine.addRule(new LuxuryHomeScoringRule());
+    tempEngine.addRule(new BridgeScoringRule());
+
     const breakdown = tempEngine._calculateScore(buildingId, tile, map);
     return ScoringEngine.createScoreReport(breakdown);
   }

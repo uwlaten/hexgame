@@ -4,8 +4,9 @@
 
 import DrawingUtils from './DrawingUtils.js';
 import Config from './Config.js';
-import { BuildingLibrary } from './BuildingLibrary.js';
+import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import { Building } from './Building.js';
+import PlacementResolver from './PlacementResolver.js';
 
 /**
  * Manages all HTML-based UI components. It creates the elements,
@@ -17,6 +18,10 @@ export default class UIManager {
    */
   constructor(eventEmitter) {
     this.eventEmitter = eventEmitter;
+
+    // These will be populated by the Game class after initialization.
+    this.player = null;
+    this.map = null;
 
     // Get references to the containers in the DOM.
     this.configPanelContainer = document.getElementById('config-panel');
@@ -52,6 +57,16 @@ export default class UIManager {
     this.eventEmitter.on('SCORE_UPDATED', score => this.updateScore(score));
     this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', tileId => this.updateNextTile(tileId));
     this.eventEmitter.on('HEX_HOVERED', payload => this.updateTooltip(payload));
+  }
+
+  /**
+   * Provides the UIManager with references to the core game state objects.
+   * @param {import('./Player.js').default} player The game's player instance.
+   * @param {import('./Map.js').default} map The game's map instance.
+   */
+  setContext(player, map) {
+    this.player = player;
+    this.map = map;
   }
 
   /**
@@ -242,9 +257,22 @@ export default class UIManager {
           // For resources, the 'name' property holds the name (e.g., 'Iron').
           tooltipText += ` | Resource: ${tile.contentType.name}`;
         }
+      } else if (this.player?.currentTileInHand && this.map) {
+        // If the tile is empty and the player is holding a building, show placement preview.
+        const baseBuildingId = this.player.currentTileInHand;
+        const result = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+
+        if (result.isValid) {
+          const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
+          const scoreText = result.score > 0 ? `+${result.score}` : result.score.toString();
+          const color = result.score > 0 ? 'green' : (result.score < 0 ? 'red' : 'gray');
+          tooltipText += ` | Place: <span style="color:${color};">${buildingDef.name} (${scoreText})</span>`;
+        } else {
+          tooltipText += ` | <span style="color:red;">Cannot build here</span>`;
+        }
       }
 
-      this.tooltipContainer.textContent = tooltipText;
+      this.tooltipContainer.innerHTML = tooltipText; // Use innerHTML to render the span colors
       this.tooltipContainer.style.display = 'block';
 
       // Position the tooltip near the cursor. The offset (e.g., +15px) prevents the
@@ -277,7 +305,7 @@ export default class UIManager {
     this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Savannah color as a neutral background.
 
     // Find the building's definition in the library and use the new utility to draw it.
-    const buildingDefinition = Object.values(BuildingLibrary).find(b => b.id === tileId);
+    const buildingDefinition = BuildingDefinitionMap.get(tileId);
     if (buildingDefinition?.draw) {
       DrawingUtils.drawDetails(ctx, buildingDefinition, cx, cy, hexSize);
     }

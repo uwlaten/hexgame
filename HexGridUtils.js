@@ -124,4 +124,24 @@ export default class HexGridUtils {
 
     return center;
   }
+
+  /**
+   * Gets the 6 vertices that form the corners of a given tile.
+   * @param {import('./HexTile.js').default} tile The tile to get vertices for.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {string[]} An array of 6 unique vertex IDs.
+   */
+  static getVerticesForTile(tile, map) {
+    const vertices = new Set();
+    const neighbors = this.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y));
+
+    for (let i = 0; i < 6; i++) {
+      const neighbor1 = neighbors[i];
+      const neighbor2 = neighbors[(i + 1) % 6];
+      const vertexId = this.getVertexIdFromTiles(tile, neighbor1, neighbor2);
+      if (vertexId) vertices.add(vertexId);
+    }
+
+    return Array.from(vertices);
+  }
 }

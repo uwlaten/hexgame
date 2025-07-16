@@ -3,7 +3,9 @@
  */
 
 import { Building } from './Building.js';
-import PlacementRules from './PlacementRules.js';
+import PlacementResolver from './PlacementResolver.js';
+import HexGridUtils from './HexGridUtils.js';
+import { BuildingDefinitionMap } from './BuildingLibrary.js';
 import MapGenerator from './MapGenerator.js';
 /**
  * Manages the overall game state, player actions, and game rules.
@@ -32,6 +34,9 @@ export default class Game {
   init() {
     this.eventEmitter.on('HEX_CLICKED', this._handleHexClick.bind(this));
     this.eventEmitter.on('NEW_GAME_REQUESTED', this.reset.bind(this));
+
+    // Provide the UIManager with access to the game state for previews.
+    this.uiManager.setContext(this.player, this.map);
   }
 
   /**
@@ -63,20 +68,63 @@ export default class Game {
    * @private
    */
   _handleHexClick(tile) {
-    const buildingTypeToPlace = this.player.currentTileInHand;
+    const baseBuildingId = this.player.currentTileInHand;
+    if (!baseBuildingId) return; // Player has no building to place.
 
-    // Delegate rule checking to the expert module.
-    if (PlacementRules.canPlaceBuilding(tile, buildingTypeToPlace, this.player)) {
-      // Create a new Building instance based on what's in the player's hand.
-      const newBuilding = new Building(buildingTypeToPlace);
+    // Use the PlacementResolver to determine the outcome of the placement.
+    const result = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+
+    if (result.isValid) {
+      // Create a new Building instance based on the *resolved* type.
+      const newBuilding = new Building(result.resolvedBuildingId);
       tile.setContent(newBuilding);
-      console.log(`Placed '${buildingTypeToPlace}' on tile (${tile.x}, ${tile.y})`);
+
+      // Log the placement and score breakdown
+      console.groupCollapsed(`Placed '${result.resolvedBuildingId}' on tile (${tile.x}, ${tile.y}) with a score of ${result.score.total}`);
+      for (const component of result.score.breakdown) {
+        console.log(`${component.rule}: ${component.reason} (+${component.points})`);
+      }
+      console.groupEnd();
+
+      // console.log(`Placed '${result.resolvedBuildingId}' on tile (${tile.x}, ${tile.y}) with a score of ${result.score}`);
+
+      // Handle resource claiming if the new building is a resource extractor.
+      this._handleResourceClaim(newBuilding, tile);
 
       // Announce that a building has been placed for other systems to react to.
       this.eventEmitter.emit('BUILDING_PLACED', tile);
 
+      // If the City Centre was just placed, update the player state.
+      if (baseBuildingId === 'CityCentre') {
+        this.player.cityCentrePlaced = true;
+        this.player.deck = this.player._generateDeck();
+      }
+
       // After placing, the player draws a new tile.
       this.player.drawNewTile();
+    }
+  }
+
+  /**
+   * Checks if a newly placed building claims a resource and updates the resource's state.
+   * @param {Building} building The building instance that was just placed.
+   * @param {import('./HexTile.js').default} tile The tile the building was placed on.
+   * @private
+   */
+  _handleResourceClaim(building, tile) {
+    const buildingDef = BuildingDefinitionMap.get(building.type);
+    const resourceToClaim = buildingDef?.claimsResource;
+
+    if (!resourceToClaim) return;
+
+    const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
+    for (const coord of neighbors) {
+      const neighborTile = this.map.getTileAt(coord.x, coord.y);
+      if (neighborTile?.contentType?.id === resourceToClaim && !neighborTile.contentType.isClaimed) {
+        neighborTile.contentType.isClaimed = true;
+        console.log(`Resource '${resourceToClaim}' at (${neighborTile.x}, ${neighborTile.y}) was claimed by '${building.type}'.`);
+        break; // A building only claims one resource.
+      }
     }
   }
 }

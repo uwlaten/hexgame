@@ -13,7 +13,6 @@ import Game from './Game.js';
 import UIManager from './UIManager.js';
 import InputHandler from './InputHandler.js';
 import ScoringEngine from './ScoringEngine.js';
-import { ResidenceOnSteppeRule } from './ScoringRules.js';
 import Config from './Config.js';
 
 /**
@@ -72,8 +71,6 @@ function main() {
   // The ScoringEngine manages all scoring logic.
   const scoringEngine = new ScoringEngine(eventEmitter, player);
   // Register the rules we want to use for this game.
-  scoringEngine.addRule(new ResidenceOnSteppeRule());
-  scoringEngine.init();
 
   const gameLoop = new GameLoop(renderer, gameMap);
 
