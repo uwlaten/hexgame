@@ -25,6 +25,9 @@ export default class PlacementResolver {
    * @returns {{isValid: boolean, resolvedBuildingId: string|null, score: number}} An object describing the outcome.
    */
   static resolvePlacement(baseBuildingId, targetTile, map, player) {
+    
+    console.log(`resolvePlacement called for (${targetTile.x}, ${targetTile.y}), building: ${baseBuildingId}`);  // Debugging
+    
     // Phase 1: Basic Placement Rules (Blocking)
     // Delegate the initial hard-blocking checks to PlacementRules.
     const canPlace = PlacementRules.canPlaceBuilding(targetTile, baseBuildingId, player, map);
@@ -42,7 +45,7 @@ export default class PlacementResolver {
     // Phase 2: Reciprocal Negative Check
     // Re-check if placing this building would invalidate a future placement on an adjacent tile.
     // Now that we know the final outcome, we can check using the resolved building ID.
-    if (this._checkReciprocalNegative(finalOutcome.id, targetTile, map, player, finalOutcome.id)) {
+    if (this._preservesAdjacentValue(finalOutcome.id, targetTile, map, player, finalOutcome.id)) {
       return { isValid: false, resolvedBuildingId: null, score: 0 };
     }
 
@@ -60,7 +63,8 @@ export default class PlacementResolver {
    * Checks if placing a building would create a negative-scoring situation for adjacent tiles.
    * @private
    */
-  static _checkReciprocalNegative(placingId, placingTile, map, player, resolvedBuildingId) {
+  static _preservesAdjacentValue(placingId, placingTile, map, player, resolvedBuildingId) {
+    // 1. Only Loop Through Existing Buildings
     const neighbors = HexGridUtils.getNeighbors(placingTile.x, placingTile.y)
       .map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
 
@@ -71,23 +75,20 @@ export default class PlacementResolver {
         const existingBuildingDef = BuildingDefinitionMap.get(neighborTile.contentType.type);
         baseBuildingDefsToCheck.push(BuildingDefinitionMap.get(existingBuildingDef.baseId) || existingBuildingDef);
       }
-      // Check against empty tiles by simulating all possible base buildings
-      else if (PlacementRules.canPlaceBuilding(neighborTile, 'Residence', player, map)) { // Use a dummy building type for checks.
-        baseBuildingDefsToCheck = [BuildingLibrary.INDUSTRY, BuildingLibrary.RESIDENCE, BuildingLibrary.ROAD];
-      }
-
-      for (const baseDef of baseBuildingDefsToCheck) {
-        // Use the resolved building ID for the hypothetical check, but fall back to the base
-        // ID if the resolved one isn't provided (for other potential uses of this function).
-        const idForHypotheticalCheck = resolvedBuildingId || placingId;
-        const hypotheticalOutcomes = this._getPossibleOutcomes(baseDef, neighborTile, map, {
-          hypotheticalNeighbor: { tile: placingTile, buildingId: idForHypotheticalCheck },
-        });
-        const hasNegative = hypotheticalOutcomes.some(o => o.isNegative && o.score.total < 0);
-        if (hasNegative) return true; // Found a reciprocal negative, placement is blocked.
-      }
+      
+      // 2. Implement the "What If" Test
+      for (const baseDef of baseBuildingDefsToCheck) {        
+        const hypotheticalOutcomes = this._getPossibleOutcomes(
+          baseDef, neighborTile, map,
+          { hypotheticalNeighbor: { tile: placingTile, buildingId: resolvedBuildingId } }
+        );
+        const hypotheticalFinalOutcome = this._determineFinalOutcome(hypotheticalOutcomes, baseDef, neighborTile, map);
+        
+        // 3. Updated Final Condition
+        if (hypotheticalFinalOutcome.score.total < 0) return true;
+      }      
     }
-    return false; // No reciprocal negatives found.
+    return false; // No adjacent value preservation failures found.
   }
 
   /**

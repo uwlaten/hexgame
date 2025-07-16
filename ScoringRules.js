@@ -49,27 +49,6 @@ export class BasePlacementScore extends ScoringRule {
   }
 }
 
-/**
- * Score for placing any residence-type building on Steppe.
- */
-export class ResidenceOnSteppeRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const buildingDef = BuildingDefinitionMap.get(buildingId);
-    if (!buildingDef) return [];
-
-    const isResidenceType = buildingId === BuildingLibrary.RESIDENCE.id || buildingDef.baseId === BuildingLibrary.RESIDENCE.id;
-    const isOnSteppe = tile.biome.id === BiomeLibrary.STEPPE.id;
-
-    if (isResidenceType && isOnSteppe) {
-      return [{
-        rule: "ResidenceOnSteppeRule",
-        reason: "Residence on Steppe bonus",
-        points: 1,
-      }];
-    }
-    return [];
-  }
-}
 
 
 
@@ -279,5 +258,5 @@ export const AllRules = {
   RiverfrontHomeScoringRule,
   LuxuryHomeScoringRule,
   BridgeScoringRule,
-  ResidenceOnSteppeRule,
+  
 };

@@ -102,8 +102,18 @@ export default class Game {
 
       // After placing, the player draws a new tile.
       this.player.drawNewTile();
+
+
+      // Immediately update the tooltip on the placed tile
+      // Simulate a "hover" event on the *same* tile. This will trigger the UI to
+      // refresh the tooltip with the building now present.  We pass in a null
+      // event to indicate this isn't a real mouse movement.
+      this.eventEmitter.emit('HEX_HOVERED', { tile, event: null });
     }
   }
+
+
+  
 
   /**
    * Checks if a newly placed building claims a resource and updates the resource's state.

@@ -30,6 +30,7 @@ export default class PlacementRules {
 
     // Rule 3: Cannot build on Oasis features.
     if (tile.feature?.id === 'oasis') return false;
+    console.log(`Tile (${tile.x}, ${tile.y}) feature:`, tile.feature); // Debugging
 
     // --- Adjacency Rule ---
     // Rule 4: Must be adjacent to an existing building, unless placing the City Centre.

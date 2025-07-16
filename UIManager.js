@@ -264,7 +264,8 @@ export default class UIManager {
 
         if (result.isValid) {
           const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
-          const scoreText = result.score > 0 ? `+${result.score}` : result.score.toString();
+          const scoreText = result.score.total > 0 ? `+${result.score.total}` : result.score.total.toString();
+
           const color = result.score > 0 ? 'green' : (result.score < 0 ? 'red' : 'gray');
           tooltipText += ` | Place: <span style="color:${color};">${buildingDef.name} (${scoreText})</span>`;
         } else {
@@ -280,9 +281,16 @@ export default class UIManager {
       // trigger a 'mouseleave' event on the canvas.
       this.tooltipContainer.style.left = `${event.clientX + 15}px`;
       this.tooltipContainer.style.top = `${event.clientY + 15}px`;
-    } else {
-      // If the tile or event is null, hide the tooltip.
-      this.tooltipContainer.style.display = 'none';
+    } else if (tile) {
+      // Building placed: Update tooltip content but keep it visible at its last position.
+      let tooltipText = `Coords: (${tile.x}, ${tile.y}) | Building: ${tile.contentType.type}`;  // Show building info after placement.
+      this.tooltipContainer.innerHTML = tooltipText;
+      this.tooltipContainer.style.display = 'block'; // Ensure it's still visible.
+    }
+    else {
+        // If the tile AND event are null (mouse off canvas), hide the tooltip.
+        // This condition isolates the 'mouse off' case.
+        this.tooltipContainer.style.display = 'none';
     }
   }
 
