@@ -31,18 +31,23 @@ export default class PlacementResolver {
 
     if (!canPlace) return { isValid: false, resolvedBuildingId: null, score: 0 };
 
-    // Phase 2: Reciprocal Negative Check
-    // Check if placing this building would invalidate a future placement on an adjacent tile.
-    if (this._checkReciprocalNegative(baseBuildingId, targetTile, map, player)) {
-      return { isValid: false, resolvedBuildingId: null, score: 0 };
-    }
-
     // Phase 3: Find and Score All Possible Transformations
     const baseBuildingDef = BuildingDefinitionMap.get(baseBuildingId);
     const possibleOutcomes = this._getPossibleOutcomes(baseBuildingDef, targetTile, map);
 
-    // Phase 4: Determine the Final Outcome based on game rules
+    // Pre-Phase 4: Determine the final outcome *before* the reciprocal check.
+    // This way, we know the resolved building type.
     const finalOutcome = this._determineFinalOutcome(possibleOutcomes, baseBuildingDef, targetTile, map);
+
+    // Phase 2: Reciprocal Negative Check
+    // Re-check if placing this building would invalidate a future placement on an adjacent tile.
+    // Now that we know the final outcome, we can check using the resolved building ID.
+    if (this._checkReciprocalNegative(finalOutcome.id, targetTile, map, player, finalOutcome.id)) {
+      return { isValid: false, resolvedBuildingId: null, score: 0 };
+    }
+
+    // Phase 4: Determine the Final Outcome based on game rules
+    // This phase is now handled earlier, but we still return the same structure.
 
     return {
       isValid: true,
@@ -55,7 +60,7 @@ export default class PlacementResolver {
    * Checks if placing a building would create a negative-scoring situation for adjacent tiles.
    * @private
    */
-  static _checkReciprocalNegative(placingId, placingTile, map, player) {
+  static _checkReciprocalNegative(placingId, placingTile, map, player, resolvedBuildingId) {
     const neighbors = HexGridUtils.getNeighbors(placingTile.x, placingTile.y)
       .map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
 
@@ -72,8 +77,11 @@ export default class PlacementResolver {
       }
 
       for (const baseDef of baseBuildingDefsToCheck) {
+        // Use the resolved building ID for the hypothetical check, but fall back to the base
+        // ID if the resolved one isn't provided (for other potential uses of this function).
+        const idForHypotheticalCheck = resolvedBuildingId || placingId;
         const hypotheticalOutcomes = this._getPossibleOutcomes(baseDef, neighborTile, map, {
-          hypotheticalNeighbor: { tile: placingTile, buildingId: placingId },
+          hypotheticalNeighbor: { tile: placingTile, buildingId: idForHypotheticalCheck },
         });
         const hasNegative = hypotheticalOutcomes.some(o => o.isNegative && o.score.total < 0);
         if (hasNegative) return true; // Found a reciprocal negative, placement is blocked.

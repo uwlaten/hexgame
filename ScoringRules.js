@@ -4,7 +4,7 @@
  * This creates a flexible, data-driven scoring system.
  */
 
-import { BuildingLibrary } from './BuildingLibrary.js';
+import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
 import { Building } from './Building.js';
@@ -48,6 +48,30 @@ export class BasePlacementScore extends ScoringRule {
     }];
   }
 }
+
+/**
+ * Score for placing any residence-type building on Steppe.
+ */
+export class ResidenceOnSteppeRule extends ScoringRule {
+  evaluate(tile, buildingId, map) {
+    const buildingDef = BuildingDefinitionMap.get(buildingId);
+    if (!buildingDef) return [];
+
+    const isResidenceType = buildingId === BuildingLibrary.RESIDENCE.id || buildingDef.baseId === BuildingLibrary.RESIDENCE.id;
+    const isOnSteppe = tile.biome.id === BiomeLibrary.STEPPE.id;
+
+    if (isResidenceType && isOnSteppe) {
+      return [{
+        rule: "ResidenceOnSteppeRule",
+        reason: "Residence on Steppe bonus",
+        points: 1,
+      }];
+    }
+    return [];
+  }
+}
+
+
 
 /**
  * Score for placing a Mine.
@@ -238,3 +262,22 @@ export class BridgeScoringRule extends ScoringRule {
     }];
   }
 }
+
+
+/**
+ * A single collection of all available scoring rule classes.
+ * This allows the ScoringEngine to dynamically register all rules without
+ * needing to know their specific names.
+ */
+export const AllRules = {
+  BasePlacementScore,
+  MineScoringRule,
+  IronMineScoringRule,
+  QuarryScoringRule,
+  PollutedSlumScoringRule,
+  HilltopVillaScoringRule,
+  RiverfrontHomeScoringRule,
+  LuxuryHomeScoringRule,
+  BridgeScoringRule,
+  ResidenceOnSteppeRule,
+};

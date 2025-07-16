@@ -4,12 +4,8 @@
  * This creates a flexible, data-driven scoring system.
  */
 
-import {
-  BasePlacementScore,
-  MineScoringRule, IronMineScoringRule, QuarryScoringRule,
-  PollutedSlumScoringRule, HilltopVillaScoringRule, RiverfrontHomeScoringRule, LuxuryHomeScoringRule,
-  BridgeScoringRule 
-} from './ScoringRules.js';
+
+import { AllRules, ScoringRule } from './ScoringRules.js';
 import EventEmitter from './EventEmitter.js';
 
 /**
@@ -39,15 +35,11 @@ export default class ScoringEngine {
   _registerCoreRules() {
 
     // Initialize the engine with the registered rules.
-    this.addRule(new BasePlacementScore());
-    this.addRule(new MineScoringRule());
-    this.addRule(new IronMineScoringRule());
-    this.addRule(new QuarryScoringRule());
-    this.addRule(new PollutedSlumScoringRule());
-    this.addRule(new HilltopVillaScoringRule());
-    this.addRule(new RiverfrontHomeScoringRule());
-    this.addRule(new LuxuryHomeScoringRule());
-    this.addRule(new BridgeScoringRule());
+     for (const RuleClass of Object.values(AllRules)) {
+      if (RuleClass !== ScoringRule && RuleClass.prototype instanceof ScoringRule) {
+        this.addRule(new RuleClass());
+      }
+    }
   }
 
   /**
@@ -72,9 +64,13 @@ export default class ScoringEngine {
    * @returns {number} The calculated score for the hypothetical placement.
    */
   static calculateScoreFor(buildingId, tile, map){
-    // In this static version, we create a temporary ScoringEngine with the registered rules,
-    // but without a player to update. We then use it to evaluate the score.
-    const tempEngine = new ScoringEngine(new EventEmitter(), null); // Temporary emitter, no player
+    // In this static version, we create a temporary ScoringEngine with the
+    // registered rules, but without a player to update. We then use it to
+    // evaluate the score. Note that a temporary event emitter is still
+    // required, as it's a required parameter for the constructor. However,
+    // no events will ever be emitted on it, as this method is purely
+    // for calculation.
+    const tempEngine = new ScoringEngine(new EventEmitter(), null);
     const breakdown = tempEngine._calculateScore(buildingId, tile, map);
     return ScoringEngine.createScoreReport(breakdown);
   }
