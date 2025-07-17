@@ -240,6 +240,65 @@ export default class Renderer {
   }
 
   /**
+   * Draws outlines around linked claimed resources using the offset strategy.
+   * @param {import('./Map.js').default} map The map object.
+   * @private
+   */
+  _drawClaimOutlines(map) {
+    if (map.claimedLinks.size === 0) return;
+
+    this.ctx.strokeStyle = 'red';
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+
+    const offset = 2; // How many pixels to draw the line inside the perimeter.
+
+    for (const link of map.claimedLinks) {
+      const { buildingTile, resourceTile } = link;
+
+      const perimeterVertexIds = HexGridUtils.getOuterPerimeter([buildingTile, resourceTile], map);
+      if (perimeterVertexIds.length === 0) continue;
+
+      const perimeterPixels = perimeterVertexIds.map(vId => this._getVertexPixelCoords(vId, map)).filter(Boolean);
+
+      if (perimeterPixels.length < 2) continue;
+
+      //console.log("Perimeter Pixels:", perimeterPixels);
+
+      // Calculate the geometric center (centroid) of the combined shape.
+      // We will offset each point towards this centroid.
+      const centroid = perimeterPixels.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+      centroid.x /= perimeterPixels.length;
+      centroid.y /= perimeterPixels.length;
+
+      this.ctx.beginPath();
+
+      for (let i = 0; i < perimeterPixels.length; i++) {
+        const point = perimeterPixels[i];
+        //console.log("i", i);
+        // Calculate the vector from the current point towards the centroid.
+        const vectorX = centroid.x - point.x;
+        const vectorY = centroid.y - point.y;
+
+        // Normalize the vector to get a direction.
+        const magnitude = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
+        if (magnitude === 0) continue; // Should not happen, but safe to check.
+        const directionX = vectorX / magnitude;
+        const directionY = vectorY / magnitude;
+
+        // Calculate the new, offset point.
+        const offsetX = point.x + directionX * offset;
+        const offsetY = point.y + directionY * offset;
+
+        i === 0 ? this.ctx.moveTo(offsetX, offsetY) : this.ctx.lineTo(offsetX, offsetY);
+      }
+      
+      this.ctx.stroke();
+    }
+  }
+
+  /**
    * Clears the canvas and draws the entire map.
    * @param {import('./Map.js').default} map The map object to draw.
    */
@@ -263,7 +322,10 @@ export default class Renderer {
       }
     }
 
-    // Draw rivers on top of the tiles.
+    // Draw the claim outlines on top of the tiles.
+    this._drawClaimOutlines(map);
+
+    // Draw rivers on top of tiles and outlines.
     this._drawRivers(map);
 
     // Restore the context to its original state

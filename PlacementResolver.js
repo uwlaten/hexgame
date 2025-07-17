@@ -26,7 +26,7 @@ export default class PlacementResolver {
    */
   static resolvePlacement(baseBuildingId, targetTile, map, player) {
     
-    console.log(`resolvePlacement called for (${targetTile.x}, ${targetTile.y}), building: ${baseBuildingId}`);  // Debugging
+    //console.log(`resolvePlacement called for (${targetTile.x}, ${targetTile.y}), building: ${baseBuildingId}`);  // Debugging
     
     // Phase 1: Basic Placement Rules (Blocking)
     // Delegate the initial hard-blocking checks to PlacementRules.

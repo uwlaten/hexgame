@@ -3,7 +3,6 @@
  * hexagonal tile on the game map.
  */
 import { Building } from './Building.js';
-import { ResourceLibrary } from './ResourceLibrary.js';
 
 /**
  * Represents a single tile in the game world.
@@ -63,13 +62,11 @@ export default class HexTile {
   }
 
   /**
-   * Sets the content of the tile, ensuring it's a valid type (Building, Resource, or null).
-   * This enforces the rule that a tile can hold one piece of content at a time.
-   * @param {Building|object|null} content The content to place on the tile. Can be a Building instance or a Resource definition from the library.
+   * Sets the content of the tile, which can be a Building instance or a Resource object.
+   * @param {Building|object|null} content The content to place on the tile.
    */
   setContent(content) {
-    // Check if the content is one of the plain objects from our ResourceLibrary.
-    const isResourceDefinition = content && Object.values(ResourceLibrary).includes(content);
+    const isResourceDefinition = content && typeof content === 'object' && content.id;
 
     if (content === null || content instanceof Building || isResourceDefinition) {
       this.contentType = content;

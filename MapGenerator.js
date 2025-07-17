@@ -95,6 +95,7 @@ export default class MapGenerator {
 
     // Ensure the grid is empty before we start generating.
     map.rivers.clear(); // Clear any previous river data.
+    map.claimedLinks.clear(); // Clear any previous claim data.
     map.grid = [];
 
     // 4. Create tiles based on the final elevation and sea level.
@@ -1709,7 +1710,9 @@ export default class MapGenerator {
           if (!tile.contentType && !this._isAdjacentToResource(tile, map)) {
             const resourceDef = ResourceLibrary[resourceId.toUpperCase()];
             if (resourceDef) {              
-              // Place a *copy* of the resource, not the original definition.
+                // Place a *copy* of the resource, not the original definition.
+                // This uses the spread syntax to create a shallow copy. If the resource
+                // definitions had nested objects, a deep copy would be necessary.
               tile.setContent(resourceDef);
               return true; // Successfully placed.
             }

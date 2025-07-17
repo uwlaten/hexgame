@@ -144,4 +144,87 @@ export default class HexGridUtils {
 
     return Array.from(vertices);
   }
+
+  /**
+   * Calculates the outer perimeter of two adjacent tiles as an ordered list of vertex IDs.
+   * This is used for drawing a continuous border around a linked building and resource.
+   * @param {import('./HexTile.js').default} tileA The first tile.
+   * @param {import('./HexTile.js').default} tileB The second, adjacent tile.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {string[]} An ordered array of vertex IDs forming the outer perimeter, or an empty array if tiles are not adjacent.
+   */
+  static getOuterPerimeter(tiles, map) {
+    // --- Step 4: Collect all edges and find the unique outer ones ---
+    const allEdges = tiles.flatMap(tile => this.getEdgesForTile(tile, map));
+
+    const edgeCounts = new Map();
+    for (const edgeId of allEdges) {
+      edgeCounts.set(edgeId, (edgeCounts.get(edgeId) || 0) + 1);
+    }
+
+    const outerEdges = [];
+    for (const [edgeId, count] of edgeCounts.entries()) {
+      if (count === 1) {
+        outerEdges.push(edgeId);
+      }
+    }
+
+    // --- Step 5: Order the edges into a continuous path of vertices ---
+    if (outerEdges.length === 0) {
+      return [];
+    }
+
+    // 1. Build an adjacency list to represent the connections in the perimeter graph.
+    const adjacencyList = new Map();
+    for (const edgeId of outerEdges) {
+      const [v1, v2] = this.getVerticesForEdge(edgeId);
+      if (!adjacencyList.has(v1)) adjacencyList.set(v1, []);
+      if (!adjacencyList.has(v2)) adjacencyList.set(v2, []);
+      adjacencyList.get(v1).push(v2);
+      adjacencyList.get(v2).push(v1);
+    }
+
+    // 2. Start the traversal from an arbitrary point.
+    const path = [];
+    const startVertex = outerEdges[0].split('--')[0];
+    let previousVertex = null;
+    let currentVertex = startVertex;
+
+    // 3. Walk along the perimeter until all vertices are in the path.
+    while (path.length < outerEdges.length) {
+      path.push(currentVertex);
+      const neighbors = adjacencyList.get(currentVertex);
+
+      // Find the next vertex in the path that is not the one we just came from.
+      const nextVertex = neighbors.find(v => v !== previousVertex);
+
+      if (!nextVertex && path.length < outerEdges.length) {
+        console.error("Perimeter path ordering failed: Path is broken.", { currentVertex, path, adjacencyList });
+        return []; // Return empty to prevent rendering errors.
+      }
+
+      previousVertex = currentVertex;
+      currentVertex = nextVertex;
+    }
+    return path;
+  }
+
+  /**
+   * Gets the 6 edges that form the perimeter of a given tile.
+   * @param {import('./HexTile.js').default} tile The tile to get edges for.
+   * @param {import('./Map.js').default} map The map object.
+   * @returns {string[]} An array of 6 unique edge IDs.
+   */
+  static getEdgesForTile(tile, map) {
+    const vertices = this.getVerticesForTile(tile, map);
+    const edges = [];
+    // Loop to create edges between consecutive vertices.
+    for (let i = 0; i < vertices.length; i++) {
+      const v1 = vertices[i];
+      const v2 = vertices[(i + 1) % vertices.length]; // Wrap around to the first vertex at the end.
+      const edgeId = this.getEdgeId(v1, v2);
+      edges.push(edgeId);
+    }
+    return edges;
+  }
 }

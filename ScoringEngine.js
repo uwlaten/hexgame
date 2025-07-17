@@ -1,10 +1,7 @@
 /**
  * @fileoverview Defines the ScoringEngine class, which processes game events
  * against a set of rules to update the player's score.
- * This creates a flexible, data-driven scoring system.
  */
-
-
 import { AllRules, ScoringRule } from './ScoringRules.js';
 import EventEmitter from './EventEmitter.js';
 
@@ -29,14 +26,14 @@ export default class ScoringEngine {
      */
     this.rules = [];
     this._registerCoreRules();
-    
+
   }
 
   _registerCoreRules() {
 
     // Initialize the engine with the registered rules.
      for (const RuleClass of Object.values(AllRules)) {
-      if (RuleClass !== ScoringRule && RuleClass.prototype instanceof ScoringRule) {
+      if (typeof RuleClass === 'function' && RuleClass !== ScoringRule && RuleClass.prototype instanceof ScoringRule) {
         this.addRule(new RuleClass());
       }
     }
@@ -63,7 +60,10 @@ export default class ScoringEngine {
    * @param {import('./Map.js').default} map The game map.
    * @returns {number} The calculated score for the hypothetical placement.
    */
-  static calculateScoreFor(buildingId, tile, map){
+  static calculateScoreFor(buildingId, tile, map) {
+    if (!tile) {
+      throw new Error("calculateScoreFor called with a null tile.");
+    }
     // In this static version, we create a temporary ScoringEngine with the
     // registered rules, but without a player to update. We then use it to
     // evaluate the score. Note that a temporary event emitter is still
@@ -84,9 +84,6 @@ export default class ScoringEngine {
     return allComponents.filter(component => component.points !== 0);
   }
 
-
-
-
   /**
    * Handles the BUILDING_PLACED event, calculates score changes, and updates the player.
    * @param {import('./HexTile.js').default} tile The tile where the building was placed.
@@ -101,4 +98,13 @@ export default class ScoringEngine {
     this.player.score += scoreReport.total;
     this.eventEmitter.emit('SCORE_UPDATED', this.player.score);
   }
+
+    /**
+   * Initializes the engine by subscribing to relevant game events.
+   */
+  init() {
+    // This will listen for a new, more specific event that we will create in the next step.
+    this.eventEmitter.on('BUILDING_PLACED', this._handleBuildingPlaced.bind(this));
+  }
+
 }

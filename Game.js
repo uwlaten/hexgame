@@ -131,7 +131,12 @@ export default class Game {
     for (const coord of neighbors) {
       const neighborTile = this.map.getTileAt(coord.x, coord.y);
       if (neighborTile?.contentType?.id === resourceToClaim && !neighborTile.contentType.isClaimed) {
+        // Mark the resource as claimed
         neighborTile.contentType.isClaimed = true;
+
+        // Store the link between the building's tile and the resource's tile
+        this.map.claimedLinks.add({ buildingTile: tile, resourceTile: neighborTile });
+
         console.log(`Resource '${resourceToClaim}' at (${neighborTile.x}, ${neighborTile.y}) was claimed by '${building.type}'.`);
         break; // A building only claims one resource.
       }

@@ -39,6 +39,13 @@ export default class Map {
      * @type {Set<string>}
      */
     this.rivers = new Set();
+
+    /**
+     * A set of objects representing links between claiming buildings and claimed resources.
+     * Each object has the shape { buildingTile: HexTile, resourceTile: HexTile }.
+     * @type {Set<{buildingTile: import('./HexTile.js').default, resourceTile: import('./HexTile.js').default}>}
+     */
+    this.claimedLinks = new Set();
   }
 
   /**

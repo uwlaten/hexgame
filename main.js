@@ -70,6 +70,7 @@ function main() {
 
   // The ScoringEngine manages all scoring logic.
   const scoringEngine = new ScoringEngine(eventEmitter, player);
+  scoringEngine.init();
   // Register the rules we want to use for this game.
 
   const gameLoop = new GameLoop(renderer, gameMap);
