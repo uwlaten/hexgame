@@ -60,7 +60,7 @@ export default class Game {
     this.renderer.canvas.width = dimensions.width;
     this.renderer.canvas.height = dimensions.height;
 
-    this.renderer.drawMap(this.map);
+    this.eventEmitter.emit('MAP_STATE_CHANGED');
   }
 
   /**

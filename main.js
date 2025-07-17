@@ -6,7 +6,6 @@
 import Map from './Map.js';
 import MapGenerator from './MapGenerator.js';
 import Renderer from './Renderer.js';
-import GameLoop from './GameLoop.js';
 import EventEmitter from './EventEmitter.js';
 import Player from './Player.js';
 import Game from './Game.js'; 
@@ -61,6 +60,9 @@ function main() {
   canvas.width = dimensions.width;
   canvas.height = dimensions.height;
 
+  //Draw the map for the first time
+  renderer.drawMap(gameMap);
+
   // The input handler translates raw browser events into game events.
   const inputHandler = new InputHandler(canvas, eventEmitter, renderer, gameMap);
   inputHandler.init(); // Attaches the click listener
@@ -73,11 +75,7 @@ function main() {
   const scoringEngine = new ScoringEngine(eventEmitter, player);
   // Register the rules we want to use for this game.
 
-  const gameLoop = new GameLoop(renderer, gameMap);
-
-  // --- 3. START THE GAME ---
-  // The game loop will now handle all rendering.
-  gameLoop.start();
+  
 }
 
 // Wait for the HTML document to be fully loaded before running the main function.

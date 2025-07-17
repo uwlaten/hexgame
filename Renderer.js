@@ -58,8 +58,15 @@ export default class Renderer {
    * Initializes the renderer by setting up event listeners.
    */
   init() {
-    // Subscribe to the MAP_CHANGED event.
-    
+    // Subscribe to the MAP_STATE_CHANGED event. This will become the primary
+    // trigger for redrawing the entire map when the game's logical state changes.
+    this.eventEmitter.on('MAP_STATE_CHANGED', () => {
+      this.drawMap(this.map);
+    });
+    // Also subscribe to HEX_HOVERED to allow dynamic updates
+    this.eventEmitter.on('HEX_HOVERED', () => {
+      this.drawMap(this.map);
+    });
   }
 
   /**
