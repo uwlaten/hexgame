@@ -28,14 +28,17 @@ export const BuildingLibrary = {
     transformations: [
       {
         id: 'IronMine',
+        name: 'Iron Mine',
         conditions: [{ type: 'adjacentToResource', id: 'Iron', claimed: false }],
       },
       {
         id: 'Quarry',
+        name: 'Stone Quarry',
         conditions: [{ type: 'adjacentToResource', id: 'Stone', claimed: false }],
       },
       {
         id: 'Mine',
+        name: 'Mine',
         conditions: [{ type: 'feature', id: 'hills' }],
       },
     ],
@@ -58,15 +61,18 @@ export const BuildingLibrary = {
       {
         id: 'PollutedSlum',
         isNegative: true,
+        name: 'Polluted Slum',
         conditions: [{ type: 'adjacentToBuilding', id: 'Mine' }],
       },
       // Positive bonuses.
       {
         id: 'HilltopVilla',
+        name: 'Hilltop Villa',
         conditions: [{ type: 'feature', id: 'hills' }],
       },
       {
         id: 'RiverfrontHome',
+        name: 'Riverfront Home',
         conditions: [{ type: 'adjacentToRiver' }],
       },
     ],
@@ -85,6 +91,7 @@ export const BuildingLibrary = {
     transformations: [
       {
         id: 'Bridge',
+        name: 'Bridge',
         conditions: [
           { type: 'onBiome', id: ['ocean', 'lake'] },
           { type: 'neighbor', property: 'biome.isBuildable', value: true, operator: 'exactly', count: 2 },

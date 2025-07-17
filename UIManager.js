@@ -324,8 +324,24 @@ export default class UIManager {
           const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
           const scoreText = result.score.total > 0 ? `+${result.score.total}` : result.score.total.toString();
 
-          const color = result.score > 0 ? 'green' : (result.score < 0 ? 'red' : 'gray');
-          tooltipText += ` | Place: <span style="color:${color};">${buildingDef.name} (${scoreText})</span>`;
+          // Determine the building name to display. If a transformation has a `name`, use it; otherwise, use the base building name.
+          let buildingName = buildingDef.name; // Default to base building name
+          if (result.resolvedBuildingId !== baseBuildingId) {
+            // Check if this transformation has a specific name (Residence transformations).
+            const transformDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
+            if (transformDef?.name) {
+              buildingName = transformDef.name; // Use transformation name if available
+            }
+          }
+
+          // Style the display based on the score.
+          let color = 'gray';  // Default for neutral scores
+          if (result.score.total > 0) {
+            color = 'green';  // Positive scores
+          } else if (result.score.total < 0) {
+            color = 'red';    // Negative scores
+          }
+          tooltipText += ` | Place: <span style="color:${color};">${buildingName} (${scoreText})</span>`;
         } else {
           tooltipText += ` | <span style="color:red;">Cannot build here</span>`;
         }
