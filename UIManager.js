@@ -6,6 +6,8 @@ import DrawingUtils from './DrawingUtils.js';
 import Config from './Config.js';
 import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import { Building } from './Building.js';
+import { Resource } from './Resource.js';
+import { ResourceLibrary } from './ResourceLibrary.js';
 import PlacementResolver from './PlacementResolver.js';
 
 /**
@@ -297,13 +299,21 @@ export default class UIManager {
 
       // Add information about the tile's content (building or resource).
       if (tile.contentType) {
-        // The contentType can be an instance of Building or a plain object from the ResourceLibrary.
         if (tile.contentType instanceof Building) {
           // For buildings, the 'type' property holds the name (e.g., 'Residence').
           tooltipText += ` | Building: ${tile.contentType.type}`;
+        } else if (tile.contentType instanceof Resource) {
+          // For resources, we need to look up the name in the ResourceLibrary
+          // using the resource's 'type' property.
+          const resourceDef = ResourceLibrary[tile.contentType.type.toUpperCase()];
+          if (resourceDef) {
+            tooltipText += ` | Resource: ${resourceDef.name}`;
+            if (tile.contentType.isClaimed) {
+              tooltipText += ' (Claimed)';
+            }
+          }
         } else {
-          // For resources, the 'name' property holds the name (e.g., 'Iron').
-          tooltipText += ` | Resource: ${tile.contentType.name}`;
+          console.warn('Unknown content type in tooltip:', tile.contentType);
         }
       } else if (this.player?.currentTileInHand && this.map) {
         // If the tile is empty and the player is holding a building, show placement preview.

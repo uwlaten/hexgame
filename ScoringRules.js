@@ -8,6 +8,7 @@ import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
 import { Building } from './Building.js';
+import { Resource } from './Resource.js';
 
 /**
  * Base class for all scoring rules. It establishes a contract that all
@@ -76,7 +77,9 @@ export class IronMineScoringRule extends ScoringRule{
 
     const isAdjacentToIron = isIronMine && HexGridUtils.getNeighbors(tile.x, tile.y).some(coord => {
       const neighbor = tile.map.getTileAt(coord.x, coord.y);
-      return neighbor?.contentType?.id === 'Iron';
+      return neighbor?.contentType instanceof Resource &&
+             neighbor.contentType.type === 'Iron' &&
+             !neighbor.contentType.isClaimed;
     });
 
     const breakdown = [];
@@ -108,7 +111,9 @@ export class QuarryScoringRule extends ScoringRule{
 
     const isAdjacentToStone = isQuarry && HexGridUtils.getNeighbors(tile.x, tile.y).some(coord => {
       const neighbor = tile.map.getTileAt(coord.x, coord.y);
-      return neighbor?.contentType?.id === 'Stone';
+      return neighbor?.contentType instanceof Resource &&
+             neighbor.contentType.type === 'Stone' &&
+             !neighbor.contentType.isClaimed;
     });
 
     const breakdown = [];

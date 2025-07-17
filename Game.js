@@ -7,6 +7,7 @@ import PlacementResolver from './PlacementResolver.js';
 import HexGridUtils from './HexGridUtils.js';
 import { BuildingDefinitionMap } from './BuildingLibrary.js';
 import MapGenerator from './MapGenerator.js';
+import { Resource } from './Resource.js';
 /**
  * Manages the overall game state, player actions, and game rules.
  * It listens for events and updates the game world accordingly.
@@ -107,6 +108,8 @@ export default class Game {
       // Immediately update the tooltip on the placed tile
       // Simulate a "hover" event on the *same* tile. This will trigger the UI to
       // refresh the tooltip with the building now present.  We pass in a null
+
+
       // event to indicate this isn't a real mouse movement.
       this.eventEmitter.emit('HEX_HOVERED', { tile, event: null });
     }
@@ -130,7 +133,9 @@ export default class Game {
     const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y);
     for (const coord of neighbors) {
       const neighborTile = this.map.getTileAt(coord.x, coord.y);
-      if (neighborTile?.contentType?.id === resourceToClaim && !neighborTile.contentType.isClaimed) {
+      if (neighborTile?.contentType instanceof Resource &&
+          neighborTile.contentType.type === resourceToClaim &&
+          !neighborTile.contentType.isClaimed) {
         neighborTile.contentType.isClaimed = true;
         console.log(`Resource '${resourceToClaim}' at (${neighborTile.x}, ${neighborTile.y}) was claimed by '${building.type}'.`);
         break; // A building only claims one resource.

@@ -14,4 +14,11 @@ export class Building {
     this.type = type;
     // In the future, this could hold instance-specific data like health or level.
   }
+
+  /**
+   * Creates a new Building instance with the same type.
+   */
+  clone() {
+    return new Building(this.type);
+  }
 }

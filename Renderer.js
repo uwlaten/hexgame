@@ -6,7 +6,9 @@ import DrawingUtils from './DrawingUtils.js';
 import Config from './Config.js';
 import HexTile from './HexTile.js';
 import { Building } from './Building.js';
-import { BuildingLibrary } from './BuildingLibrary.js';
+import { BuildingDefinitionMap } from './BuildingLibrary.js';
+import { Resource } from './Resource.js';
+import { ResourceLibrary } from './ResourceLibrary.js';
 
 /**
  * Handles all drawing operations on the HTML canvas.
@@ -16,13 +18,21 @@ export default class Renderer {
    * Creates an instance of the Renderer.
    * @param {HTMLCanvasElement} canvas The canvas element to draw on.
    * @param {number} hexSize The size (radius) of a single hexagon tile from its center to a corner.
+   * @param {import('./EventEmitter.js').default} eventEmitter The central event bus.
+   * @param {import('./Map.js').default} map The game map.
    */
-  constructor(canvas, hexSize) {
+  constructor(canvas, hexSize, eventEmitter, map) {
     /**
      * The HTML canvas element.
      * @type {HTMLCanvasElement}
      */
     this.canvas = canvas;
+    /**
+     * @type {import('./EventEmitter.js').default}
+     */
+    this.eventEmitter = eventEmitter;
+    /** @type {import('./Map.js').default} */
+    this.map = map;
 
     /**
      * The 2D rendering context for the canvas.
@@ -42,6 +52,14 @@ export default class Renderer {
      * @private
      */
     this._padding = Config.RendererConfig.padding;
+  }
+
+  /**
+   * Initializes the renderer by setting up event listeners.
+   */
+  init() {
+    // Subscribe to the MAP_CHANGED event.
+    
   }
 
   /**
@@ -100,19 +118,29 @@ export default class Renderer {
     }
 
     // If the tile has content (like a building or resource), draw it.
-    if (tile.contentType) {
-      let definitionToDraw = null;
-      if (tile.contentType instanceof Building) {
-        // For Buildings, we look up the definition in the library.
-        definitionToDraw = Object.values(BuildingLibrary).find(b => b.id === tile.contentType.type);
-      } else {
-        // For Resources, the contentType *is* the definition.
-        definitionToDraw = tile.contentType;
+    if (tile.contentType instanceof Building) {
+      // For Buildings, we look up the definition in the library by type.
+      const buildingDef = BuildingDefinitionMap.get(tile.contentType.type);
+            
+      if (buildingDef?.draw) {
+        DrawingUtils.drawDetails(this.ctx, buildingDef, cx, cy, this.hexSize);
       }
+    } else if (tile.contentType instanceof Resource) {
+      // For Resources, we also need to look up the visual definition in the library,
+      // but we use the resource's `type` property as the key.
+      const resourceDef = ResourceLibrary[tile.contentType.type.toUpperCase()];
+      if (resourceDef?.draw) {
+        DrawingUtils.drawDetails(this.ctx, resourceDef, cx, cy, this.hexSize);
 
-      // Use the drawing utility to render the icon for the building or resource.
-      if (definitionToDraw?.draw) {
-        DrawingUtils.drawDetails(this.ctx, definitionToDraw, cx, cy, this.hexSize);
+        // --- NEW: Draw a "claimed" indicator if the resource has been claimed. ---
+        if (tile.contentType.isClaimed) {
+          this.ctx.fillStyle = 'rgba(128, 128, 128, 0.5)'; // Semi-transparent grey
+          this.ctx.beginPath();
+          this.ctx.arc(cx, cy, this.hexSize * 0.4, 0, 2 * Math.PI); // Slightly smaller circle
+          this.ctx.fill();
+          // Alternatively, draw an 'X':
+          // DrawingUtils.drawX(this.ctx, cx, cy, this.hexSize * 0.5, 'rgba(0,0,0,0.8)', 2);
+        }
       }
     }
   }

@@ -8,6 +8,7 @@ import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import HexGridUtils from './HexGridUtils.js';
 import ScoringEngine from './ScoringEngine.js';
 import { Building } from './Building.js';
+import { Resource } from './Resource.js';
 
 /**
  * A static class that acts as the central engine for resolving building placements.
@@ -26,7 +27,7 @@ export default class PlacementResolver {
    */
   static resolvePlacement(baseBuildingId, targetTile, map, player) {
     
-    console.log(`resolvePlacement called for (${targetTile.x}, ${targetTile.y}), building: ${baseBuildingId}`);  // Debugging
+    //console.log(`resolvePlacement called for (${targetTile.x}, ${targetTile.y}), building: ${baseBuildingId}`);  // Debugging
     
     // Phase 1: Basic Placement Rules (Blocking)
     // Delegate the initial hard-blocking checks to PlacementRules.
@@ -192,7 +193,9 @@ export default class PlacementResolver {
         case 'adjacentToResource':
           const neighborsForResource = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
           success = neighborsForResource.some(n =>
-            n.contentType?.id === condition.id && !n.contentType.isClaimed
+            n.contentType instanceof Resource &&
+            n.contentType.type === condition.id &&
+            !n.contentType.isClaimed
           );
           break;
         case 'neighbor': // Generic neighbor property check
