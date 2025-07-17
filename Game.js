@@ -45,6 +45,7 @@ export default class Game {
    */
   reset() {
     this.player.reset();
+    this.renderer.clearOutlines();
     const options = this.uiManager.getGenerationOptions();
     const generationLog = MapGenerator.generate(this.map, options);
 
@@ -137,6 +138,10 @@ export default class Game {
           neighborTile.contentType.type === resourceToClaim &&
           !neighborTile.contentType.isClaimed) {
         neighborTile.contentType.isClaimed = true;
+        
+        // Add the pair of tiles (Industry and Resource) to the renderer's outline list.
+        this.renderer.addOutlinedGroup([tile, neighborTile]);
+
         console.log(`Resource '${resourceToClaim}' at (${neighborTile.x}, ${neighborTile.y}) was claimed by '${building.type}'.`);
         break; // A building only claims one resource.
       }

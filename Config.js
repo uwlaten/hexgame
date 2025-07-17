@@ -191,5 +191,13 @@ export default {
     }
   },
 
+  /**
+   * Defines the style for tile outlines.
+   */
+  tileOutlineStyle: {
+    strokeStyle: 'rgba(255, 0, 0, 0.8)', // Red outline
+    lineWidth: 3,
+  },
+
 
 };

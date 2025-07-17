@@ -52,6 +52,12 @@ export default class Renderer {
      * @private
      */
     this._padding = Config.RendererConfig.padding;
+
+    /**
+     * Stores groups of tiles that need a persistent outline. Each group is an array of HexTile objects.
+     * @type {HexTile[][]}
+     */
+    this.outlinedTileGroups = [];
   }
 
   /**
@@ -67,6 +73,21 @@ export default class Renderer {
     this.eventEmitter.on('HEX_HOVERED', () => {
       this.drawMap(this.map);
     });
+  }
+
+  /**
+   * Adds a group of tiles to be outlined on subsequent draws.
+   * @param {HexTile[]} tiles An array of tiles that form a single outlined group.
+   */
+  addOutlinedGroup(tiles) {
+    this.outlinedTileGroups.push(tiles);
+  }
+
+  /**
+   * Clears all persistent outlines. Called when starting a new game.
+   */
+  clearOutlines() {
+    this.outlinedTileGroups = [];
   }
 
   /**
@@ -150,6 +171,69 @@ export default class Renderer {
         }
       }
     }
+  }
+
+  /**
+   * Draws an outline around a set of tiles, excluding shared edges.
+   * @param {HexTile[]} tiles An array of HexTile objects to outline.
+   * @param {Object} style The style object for the outline (strokeStyle, lineWidth).
+   */
+  tileOutline(tiles, style) {
+    if (!tiles || tiles.length === 0) return;
+
+    const edgeIds = new Set();
+
+    // 1. Collect all edge IDs for the given tiles.
+    for (const tile of tiles) {
+      const vertexIds = HexGridUtils.getVerticesForTile(tile, this.map);
+      for (let i = 0; i < vertexIds.length; i++) {
+        const vertexId1 = vertexIds[i];
+        const vertexId2 = vertexIds[(i + 1) % vertexIds.length];
+        const edgeId = HexGridUtils.getEdgeId(vertexId1, vertexId2);
+        edgeIds.add(edgeId);
+      }
+    }
+
+    // 2. Identify and remove shared edges (duplicates).
+    const uniqueEdgeIds = new Set(edgeIds);
+    const edgesToDraw = [];
+
+    for (const edgeId of uniqueEdgeIds) {
+      let count = 0;
+      for (const tile of tiles) {
+        const vertexIds = HexGridUtils.getVerticesForTile(tile, this.map);
+        for (let i = 0; i < vertexIds.length; i++) {
+          const vertexId1 = vertexIds[i];
+          const vertexId2 = vertexIds[(i + 1) % vertexIds.length];
+          const currentEdgeId = HexGridUtils.getEdgeId(vertexId1, vertexId2);
+          if (currentEdgeId === edgeId) {
+            count++;
+          }
+        }
+      }
+      if (count === 1) {
+        edgesToDraw.push(edgeId); // Only draw if the edge appears once (not shared)
+      }
+    }
+
+    // 3. Draw the non-shared edges.
+    this.ctx.save(); // Save the current context state
+    this.ctx.strokeStyle = style.strokeStyle;
+    this.ctx.lineWidth = style.lineWidth;
+
+    for (const edgeId of edgesToDraw) {
+      const [vertexId1, vertexId2] = HexGridUtils.getVerticesForEdge(edgeId);
+      const p1 = this._getVertexPixelCoords(vertexId1, this.map);
+      const p2 = this._getVertexPixelCoords(vertexId2, this.map);
+
+      if (p1 && p2) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(p1.x, p1.y);
+        this.ctx.lineTo(p2.x, p2.y);
+        this.ctx.stroke();
+      }
+    }
+    this.ctx.restore(); // Restore the context
   }
 
   /**
@@ -300,6 +384,13 @@ export default class Renderer {
 
     // Draw rivers on top of the tiles.
     this._drawRivers(map);
+
+    // Draw persistent outlines for claimed resources, etc.
+    if (this.outlinedTileGroups.length > 0) {
+      for (const group of this.outlinedTileGroups) {
+        this.tileOutline(group, Config.tileOutlineStyle);
+      }
+    }
 
     // Restore the context to its original state
     this.ctx.restore();
