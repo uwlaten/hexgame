@@ -88,13 +88,14 @@ export const BuildingLibrary = {
   ROAD: {
     id: 'Road',
     name: 'Road',
+    buildableBiomeExceptions: ['ocean', 'lake'],
     transformations: [
       {
         id: 'Bridge',
         name: 'Bridge',
         conditions: [
           { type: 'onBiome', id: ['ocean', 'lake'] },
-          { type: 'neighbor', property: 'biome.isBuildable', value: true, operator: 'exactly', count: 2 },
+          { type: 'neighbor', property: 'biome.isBuildable', value: true, operator: 'atLeast', count: 2 },
         ],
       },
     ],
