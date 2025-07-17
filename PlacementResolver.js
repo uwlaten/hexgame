@@ -83,10 +83,13 @@ export default class PlacementResolver {
           baseDef, neighborTile, map,
           { hypotheticalNeighbor: { tile: placingTile, buildingId: resolvedBuildingId } }
         );
+        const currentScore = ScoringEngine.calculateScoreFor(neighborTile.contentType.type, neighborTile, map);
         const hypotheticalFinalOutcome = this._determineFinalOutcome(hypotheticalOutcomes, baseDef, neighborTile, map);
-        
+
         // 3. Updated Final Condition
-        if (hypotheticalFinalOutcome.score.total < 0) return true;
+        if (currentScore.total >= 0 && hypotheticalFinalOutcome.score.total < 0) return true;
+
+
       }      
     }
     return false; // No adjacent value preservation failures found.
