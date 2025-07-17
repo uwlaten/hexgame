@@ -196,8 +196,9 @@ export default {
    */
   tileOutlineStyle: {
     strokeStyle: 'rgba(255, 0, 0, 0.8)', // Red outline
-    lineWidth: 3,
+    lineWidth: 2.5,
   },
-
+  
+  tileOutlineDash: [5, 5], // Parameters for dashed format. First number: length of dash; second number: length of gap.
 
 };

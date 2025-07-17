@@ -220,12 +220,14 @@ export default class Renderer {
     this.ctx.save(); // Save the current context state
     this.ctx.strokeStyle = style.strokeStyle;
     this.ctx.lineWidth = style.lineWidth;
+    this.ctx.setLineDash(Config.tileOutlineDash);
 
-    for (const edgeId of edgesToDraw) {
+
+    for (const edgeId of edgesToDraw) {      
       const [vertexId1, vertexId2] = HexGridUtils.getVerticesForEdge(edgeId);
       const p1 = this._getVertexPixelCoords(vertexId1, this.map);
       const p2 = this._getVertexPixelCoords(vertexId2, this.map);
-
+      
       if (p1 && p2) {
         this.ctx.beginPath();
         this.ctx.moveTo(p1.x, p1.y);
@@ -233,8 +235,10 @@ export default class Renderer {
         this.ctx.stroke();
       }
     }
-    this.ctx.restore(); // Restore the context
+    this.ctx.restore();    
   }
+
+  
 
   /**
    * Calculates the required canvas dimensions to fit the entire map, including padding.
