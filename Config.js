@@ -166,7 +166,7 @@ export default {
     initialHand: ['CityCentre'],
     mainDeck: {
       Industry: 10,
-      Residence: 10,
+      Residence: 50,
       Road: 2,
     },
     initialDeckSize: 15,

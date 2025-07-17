@@ -74,7 +74,7 @@ function main() {
   // The ScoringEngine manages all scoring logic.
   const scoringEngine = new ScoringEngine(eventEmitter, player);
   // Register the rules we want to use for this game.
-
+  scoringEngine.init();
   
 }
 

@@ -186,12 +186,24 @@ export default class PlacementResolver {
           break;
         case 'adjacentToBuilding':
           const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+          const buildingIds = Array.isArray(condition.id) ? condition.id : [condition.id];
           success = neighbors.some(n => {
             if (context.hypotheticalNeighbor && n === context.hypotheticalNeighbor.tile) {
-              return context.hypotheticalNeighbor.buildingId === condition.id;
+              return buildingIds.includes(context.hypotheticalNeighbor.buildingId);
             }
-            return n.contentType?.type === condition.id;
+            return n.contentType instanceof Building && buildingIds.includes(n.contentType.type);
           });
+          break;
+        case 'adjacentToBiome':
+          const neighborsForBiome = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+          const biomeIds = Array.isArray(condition.id) ? condition.id : [condition.id];
+          success = neighborsForBiome.some(n => biomeIds.includes(n.biome.id));
+          break;
+        case 'adjacentToFeature':
+          const neighborsForFeature = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+          const featureIds = Array.isArray(condition.id) ? condition.id : [condition.id];
+          // A neighbor has a feature, and that feature's ID is in our list of desired features.
+          success = neighborsForFeature.some(n => n.feature && featureIds.includes(n.feature.id));
           break;
         case 'adjacentToResource':
           const neighborsForResource = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);

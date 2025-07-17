@@ -28,17 +28,14 @@ export const BuildingLibrary = {
     transformations: [
       {
         id: 'IronMine',
-        name: 'Iron Mine',
         conditions: [{ type: 'adjacentToResource', id: 'Iron', claimed: false }],
       },
       {
         id: 'Quarry',
-        name: 'Stone Quarry',
         conditions: [{ type: 'adjacentToResource', id: 'Stone', claimed: false }],
       },
       {
         id: 'Mine',
-        name: 'Mine',
         conditions: [{ type: 'feature', id: 'hills' }],
       },
     ],
@@ -61,20 +58,41 @@ export const BuildingLibrary = {
       {
         id: 'PollutedSlum',
         isNegative: true,
-        name: 'Polluted Slum',
-        conditions: [{ type: 'adjacentToBuilding', id: 'Mine' }],
+        conditions: [{ type: 'adjacentToBuilding', id: ['Mine', 'IronMine'] }],
       },
       // Positive bonuses.
       {
         id: 'HilltopVilla',
-        name: 'Hilltop Villa',
         conditions: [{ type: 'feature', id: 'hills' }],
       },
       {
-        id: 'RiverfrontHome',
-        name: 'Riverfront Home',
+        id: 'RiversideHome',
         conditions: [{ type: 'adjacentToRiver' }],
       },
+      {
+        id: 'DesertHub',
+        conditions: [{ type: 'adjacentToFeature', id: 'oasis' }],
+      },
+      {
+        id: 'SeafrontHomes',
+        conditions: [{ type: 'adjacentToBiome', id: ['ocean'] }],
+      },    
+      {
+        id: 'LakeLodges',
+        conditions: [{ type: 'adjacentToBiome', id: ['lake'] }],
+      },   
+      {
+        id: 'WoodlandRetreat',
+        conditions: [{ type: 'adjacentToFeature', id: 'forest' }],
+       },
+      {
+        id: 'MountainViews',
+        conditions: [{ type: 'adjacentToBiome', id: ['mountain'] }],
+      },   
+//      {
+ //       id: 'Farmstead',
+  //      conditions: [{ type: 'adjacentToBuilding', id: ['Croft', 'Farm'] }],
+  //    },   
     ],
     draw: {
       type: 'shapes',
@@ -183,9 +201,9 @@ export const BuildingLibrary = {
       ],
     },
   },
-  RIVERFRONT_HOME: {
-    id: 'RiverfrontHome',
-    name: 'Riverfront Home',
+  RIVERSIDE_HOME: {
+    id: 'RiversideHome',
+    name: 'Riverside Home',
     baseId: 'Residence',
     draw: {
       type: 'shapes',
@@ -206,6 +224,84 @@ export const BuildingLibrary = {
       shapes: [
         { type: 'polygon', fillStyle: '#800080', params: [ [-0.4, 0.4], [0.4, 0.4], [0.4, -0.2], [0, -0.5], [-0.4, -0.2] ] },
         { type: 'polygon', fillStyle: '#DA70D6', params: [ [-0.3, 0.3], [0.3, 0.3], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+      ],
+    },
+  },
+  WOODLAND_RETREAT: {
+    id: 'WoodlandRetreat',
+    name: 'Woodland Retreat',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // A log-cabin style house
+        { type: 'polygon', fillStyle: '#8B4513', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1],  [0, -0.4], [-0.3, -0.1] ] },
+        // A green roof to represent the forest
+        { type: 'polygon', fillStyle: '#228B22', params: [ [-0.4, -0.1],  [0.4, -0.1], [0, -0.5] ] },
+      ],
+    },
+  },
+
+  DESERT_HUB: {
+    id: 'DesertHub',
+    name: 'Desert Hub',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // Sandy-colored adobe house
+        { type: 'polygon', fillStyle: '#d2b48c', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        // A simple door
+        { type: 'rect', fillStyle: '#8B4513', params: [-0.1, 0.1, 0.2, 0.3] },
+      ],
+    },
+  },
+
+  SEAFRONT_HOMES: {
+    id: 'SeafrontHomes',
+    name: 'Seafront Homes',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // White house with a blue roof
+        { type: 'polygon', fillStyle: '#F0F8FF', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'polygon', fillStyle: '#4682B4', params: [ [-0.4, -0.1], [0.4, -0.1], [0, -0.5] ] },
+      ],
+    },
+  },
+
+  LAKE_LODGES: {
+    id: 'LakeLodges',
+    name: 'Lake Lodges',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // Log cabin style
+        { type: 'polygon', fillStyle: '#8B4513', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'rect', fillStyle: '#D2B48C', params: [-0.15, 0, 0.1, 0.2] },
+        { type: 'rect', fillStyle: '#D2B48C', params: [0.05, 0, 0.1, 0.2] },
+      ],
+    },
+  },
+
+  MOUNTAIN_VIEWS: {
+    id: 'MountainViews',
+    name: 'Mountain Views',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // Stone-colored house
+        { type: 'polygon', fillStyle: '#B0C4DE', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        // A small mountain peak icon on the roof
+        { type: 'polygon', fillStyle: '#FFFFFF', strokeStyle: '#696969', lineWidth: 1, params: [ [-0.2, -0.2], [0, -0.5], [0.2, -0.2] ] },
       ],
     },
   },

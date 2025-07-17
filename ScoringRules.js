@@ -8,6 +8,7 @@ import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import HexGridUtils from './HexGridUtils.js';
 import { BiomeLibrary } from './BiomeLibrary.js';
 import { Building } from './Building.js';
+import PlacementResolver from './PlacementResolver.js';
 import { Resource } from './Resource.js';
 
 /**
@@ -168,68 +169,117 @@ export class HilltopVillaScoringRule extends ScoringRule{
 /**
  * Score for placing a Riverfront Home.
  */
-export class RiverfrontHomeScoringRule extends ScoringRule{
+export class RiversideHomeScoringRule extends ScoringRule{
   evaluate(tile, buildingId, map) {
-    const isRiverfrontHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RIVERFRONT_HOME.id;
+    const isRiversideHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RIVERSIDE_HOME.id;
 
     return [{
-      rule: "RiverfrontHomeScoringRule",
-      reason: "Positive transformation to Riverfront Home",
-      points: isRiverfrontHome ? 1 : 0,
+      rule: "RiversideHomeScoringRule",
+      reason: "Positive transformation to Riverside Home",
+      points: isRiversideHome ? 1 : 0,
     }];
   }
 }
 
 /**
- * Score for placing a Luxury Home (multiple adjacency bonuses).
+ * Score for placing a Woodland Retreat.
+ */
+export class WoodlandRetreatScoringRule extends  ScoringRule {
+  evaluate(tile, buildingId, map) {
+    const isWoodlandRetreat = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.WOODLAND_RETREAT.id;
+
+    return [{
+      rule: "WoodlandRetreatScoringRule",
+      reason: "Positive transformation to Woodland Retreat",
+      points: isWoodlandRetreat ? 1 : 0,
+    }];
+  }
+}
+
+/**
+ * Score for placing a Desert Hub.
+ */
+export class DesertHubScoringRule extends ScoringRule {
+  evaluate(tile, buildingId, map) {
+    const isDesertHub = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.DESERT_HUB.id;
+    return [{
+      rule: "DesertHubScoringRule",
+      reason: "Positive transformation to Desert Hub",
+      points: isDesertHub ? 1 : 0,
+    }];
+  }
+}
+
+/**
+ * Score for placing a Seafront Home.
+ */
+export class SeafrontHomesScoringRule extends ScoringRule {
+  evaluate(tile, buildingId, map) {
+    const isSeafrontHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.SEAFRONT_HOMES.id;
+    return [{
+      rule: "SeafrontHomesScoringRule",
+      reason: "Positive transformation to Seafront Home",
+      points: isSeafrontHome ? 1 : 0,
+    }];
+  }
+}
+
+/**
+ * Score for placing a Lake Lodge.
+ */
+export class LakeLodgesScoringRule extends ScoringRule {
+  evaluate(tile, buildingId, map) {
+    const isLakeLodge = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.LAKE_LODGES.id;
+    return [{
+      rule: "LakeLodgesScoringRule",
+      reason: "Positive transformation to Lake Lodge",
+      points: isLakeLodge ? 1 : 0,
+    }];
+  }
+}
+
+/**
+ * Score for placing a Mountain Views home.
+ */
+export class MountainViewsScoringRule extends ScoringRule {
+  evaluate(tile, buildingId, map) {
+    const isMountainViews = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.MOUNTAIN_VIEWS.id;
+    return [{
+      rule: "MountainViewsScoringRule",
+      reason: "Positive transformation to Mountain Views",
+      points: isMountainViews ? 1 : 0,
+    }];
+  }
+}
+
+/**
+ * Score for placing a Luxury Home, based on the number of valid positive transformations.
  */
 export class LuxuryHomeScoringRule extends ScoringRule{
   evaluate(tile, buildingId, map) {
     const isLuxuryHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.LUXURY_HOME.id;
-    const isHilltop = isLuxuryHome && tile.feature?.id === 'hills';
-    const isRiverfront = isLuxuryHome && HexGridUtils.getNeighbors(tile.x, tile.y).some(coord => {
-        const neighbor = map.getTileAt(coord.x, coord.y);
-        if (!neighbor) {
-            return false;
-        }
-
-        return HexGridUtils.getVerticesForTile(neighbor, map).some(vertexId => this._isRiverAtVertex(vertexId, map));
-    });
-
+    if (!isLuxuryHome) {
+      return []; // Return an empty array if not a LuxuryHome
+    }
+  
+    // 1. Get the base building definition and its positive transformations.
+    const baseBuildingDef = BuildingDefinitionMap.get(BuildingLibrary.RESIDENCE.id);
+    const positiveTransformations = baseBuildingDef.transformations.filter(t => !t.isNegative);
+  
+    // 2. Count how many transformations are valid on this tile.
+    let validBonusCount = 0;
+    for (const transform of positiveTransformations) {
+      if (PlacementResolver._checkConditions(tile, transform.conditions, map)) {
+        validBonusCount++;
+      }
+    }
+  
+    // 3. Return the count as the score.
     const breakdown = [];
-    if (isLuxuryHome) {
-      breakdown.push({
-        rule: "LuxuryHomeScoringRule",
-        reason: "Positive transformation to Luxury Home",
-        points: 1,
-      });
-      if (isHilltop) {
-        breakdown.push({
-          rule: "LuxuryHomeScoringRule",
-          reason: "Residential bonus for being on Hills",
-          points: 1,
-        });
-      }
-      if (isRiverfront) {
-        breakdown.push({
-          rule: "LuxuryHomeScoringRule",
-          reason: "Residential bonus for being adjacent to a River",
-          points: 1,
-        });
-      }
-    }
+    breakdown.push({ rule: "LuxuryHomeScoringRule", reason: "Valid residential bonuses", points: validBonusCount });
+    
     return breakdown;
-  }
-
-    _isRiverAtVertex(vertexId, map) {
-        const tileCoords = HexGridUtils.getTilesForVertex(vertexId);
-        for (let i = 0; i < tileCoords.length; i++) {
-            const tile1 = tileCoords[i];
-            const tile2 = tileCoords[(i + 1) % tileCoords.length];
-            const edgeId = HexGridUtils.getEdgeId(HexGridUtils.getVertexIdFromTiles(tile1, tile2, tileCoords[(i+2) % tileCoords.length]), HexGridUtils.getVertexIdFromTiles(tile2, tile1, tileCoords[i]));
-            if (map.rivers.has(edgeId)) return true;
-        }
-    }
+  }  
 }
 
 /**
@@ -260,8 +310,12 @@ export const AllRules = {
   QuarryScoringRule,
   PollutedSlumScoringRule,
   HilltopVillaScoringRule,
-  RiverfrontHomeScoringRule,
-  LuxuryHomeScoringRule,
+  RiversideHomeScoringRule,
+  WoodlandRetreatScoringRule,
+  DesertHubScoringRule,
+  SeafrontHomesScoringRule,
+  LakeLodgesScoringRule,
+  MountainViewsScoringRule,
   BridgeScoringRule,
-  
+  LuxuryHomeScoringRule,
 };
