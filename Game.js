@@ -38,6 +38,9 @@ export default class Game {
 
     // Provide the UIManager with access to the game state for previews.
     this.uiManager.setContext(this.player, this.map);
+    // Manually trigger the first preview update now that the context is set.
+    this.uiManager.updateTilePreviews();
+    this.uiManager.updateTileCounter();
   }
 
   /**
@@ -99,7 +102,6 @@ export default class Game {
       // If the City Centre was just placed, update the player state.
       if (baseBuildingId === 'CityCentre') {
         this.player.cityCentrePlaced = true;
-        this.player.deck = this.player._generateDeck();
       }
 
       // After placing, the player draws a new tile.

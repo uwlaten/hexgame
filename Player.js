@@ -23,7 +23,7 @@ export default class Player {
     this.cityCentrePlaced = false;
     this.hand = Config.PlayerConfig.initialHand[0]; // Start with the City Centre.
 
-    this.deck = []; // The main deck is initially empty.
+    this.deck = this._generateDeck(); // The main deck is now generated and shuffled immediately.
     this.deckSize = Config.PlayerConfig.initialDeckSize;
 
     // The type of tile the player currently has selected to place on the map.
@@ -31,7 +31,7 @@ export default class Player {
 
     // Announce the initial score so the UI can display it.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
   
   _generateDeck() {
@@ -60,12 +60,12 @@ export default class Player {
     this.score = 0;
     this.cityCentrePlaced = false;
     this.hand = Config.PlayerConfig.initialHand[0];
-    this.deck = [];
+    this.deck = this._generateDeck(); // Also regenerate the deck on reset.
     this.currentTileInHand = this.hand;
 
     // Announce the reset state to the UI.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
 
   /**
@@ -84,6 +84,6 @@ export default class Player {
       console.warn('Player deck is empty. Cannot draw a new tile.');
       this.currentTileInHand = null;
     }
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
 }

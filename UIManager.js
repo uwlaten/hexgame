@@ -9,6 +9,7 @@ import { Building } from './Building.js';
 import { Resource } from './Resource.js';
 import { ResourceLibrary } from './ResourceLibrary.js';
 import PlacementResolver from './PlacementResolver.js';
+import { drawEndIndicator } from './ui/drawing.js';
 
 /**
  * Manages all HTML-based UI components. It creates the elements,
@@ -28,7 +29,6 @@ export default class UIManager {
     // Get references to the containers in the DOM.
     this.configPanelContainer = document.getElementById('config-panel');
     this.scoreContainer = document.getElementById('score-container');
-    this.nextTileContainer = document.getElementById('next-tile-container');
     this.tooltipContainer = null;
 
     // Create the elements that will be managed by this class.
@@ -40,11 +40,18 @@ export default class UIManager {
     this.waterOutput = null;
     this.mapSizeSlider = null;
     this.mapSizeOutput = null;
-    this.nextTileLabel = null;
+    this.currentTileCanvas = null;
+    this.currentTileCtx = null;
     this.nextTileCanvas = null;
     this.nextTileCtx = null;
     this.seedInput = null;
     this.randomSeedButton = null;
+    this.totalTilesCountSpan = null;
+    this.industryTilesCountSpan = null;
+    this.residenceTilesCountSpan = null;
+    this.roadTilesCountSpan = null;
+    this.currentTileNameDiv = null;
+    this.nextTileNameDiv = null;
   }
 
   /**
@@ -55,12 +62,30 @@ export default class UIManager {
     this._createSeedInput();
     this._createNewGameButton();
     this._createScoreDisplay();
-    this._createNextTileDisplay();
     this._createTooltipDisplay();
+
+    // Get references to the tile preview canvases from the HTML
+    this.currentTileCanvas = document.getElementById('current-tile-canvas');
+    this.currentTileCtx = this.currentTileCanvas.getContext('2d');
+    this.nextTileCanvas = document.getElementById('next-tile-canvas');
+    this.nextTileCtx = this.nextTileCanvas.getContext('2d');
+
+    // Get references to the tile counter spans
+    this.totalTilesCountSpan = document.getElementById('total-tiles-count');
+    this.industryTilesCountSpan = document.getElementById('industry-tiles-count');
+    this.residenceTilesCountSpan = document.getElementById('residence-tiles-count');
+    this.roadTilesCountSpan = document.getElementById('road-tiles-count');
+
+    // Get references to the tile name divs
+    this.currentTileNameDiv = document.getElementById('current-tile-name');
+    this.nextTileNameDiv = document.getElementById('next-tile-name');
 
     // Subscribe to game events to keep the UI in sync.
     this.eventEmitter.on('SCORE_UPDATED', score => this.updateScore(score));
-    this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', tileId => this.updateNextTile(tileId));
+    this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', () => {
+      this.updateTilePreviews();
+      this.updateTileCounter();
+    });
     this.eventEmitter.on('HEX_HOVERED', payload => this.updateTooltip(payload));
   }
 
@@ -178,24 +203,16 @@ export default class UIManager {
     // Create a wrapper to group the text input and button for flexbox layout.
     // This allows us to control their relative widths precisely.
     const inputWrapper = document.createElement('div');
-    inputWrapper.style.display = 'flex';
-    inputWrapper.style.flexGrow = '1'; // Allows the wrapper to fill available space
+    inputWrapper.className = 'seed-input-wrapper';
 
     this.seedInput = document.createElement('input');
     this.seedInput.type = 'text';
     this.seedInput.id = 'seed-input';
     this.seedInput.placeholder = 'Leave blank for random';
-    this.seedInput.style.width = '75%'; // Occupy the majority of the space
-    this.seedInput.style.boxSizing = 'border-box';
 
     this.randomSeedButton = document.createElement('button');
     this.randomSeedButton.id = 'random-seed-button';
     this.randomSeedButton.textContent = 'Random';
-    this.randomSeedButton.style.width = '25%'; // The button's width is ~33% of the input's
-    this.randomSeedButton.style.fontSize = '0.8em'; // Reduce font size
-    this.randomSeedButton.style.padding = '0.2em';
-    this.randomSeedButton.style.boxSizing = 'border-box';
-    this.randomSeedButton.style.marginLeft = '4px';
 
     // Add event listener to the "Random" button to generate a new seed.
     this.randomSeedButton.addEventListener('click', () => {
@@ -242,7 +259,9 @@ export default class UIManager {
   _createScoreDisplay() {
     this.scoreDisplay = document.createElement('div');
     this.scoreDisplay.className = 'score-display';
-    this.scoreContainer.appendChild(this.scoreDisplay);
+    // Insert the score display before the tile counter display to ensure correct order.
+    const tileCounter = document.getElementById('tile-counter-display');
+    this.scoreContainer.insertBefore(this.scoreDisplay, tileCounter);
   }
 
   /**
@@ -251,28 +270,6 @@ export default class UIManager {
    */
   _createTooltipDisplay() {
     this.tooltipContainer = document.getElementById('tooltip-container');
-  }
-
-  /**
-   * Creates the "Next Tile" display, which includes a text label and a canvas for the icon.
-   * @private
-   */
-  _createNextTileDisplay() {
-    const container = document.createElement('div');
-    container.className = 'next-tile-display';
-
-    this.nextTileLabel = document.createElement('span');
-    this.nextTileLabel.textContent = 'Next Tile:';
-
-    const displayConfig = Config.UIConfig.nextTileDisplay;
-    this.nextTileCanvas = document.createElement('canvas');
-    this.nextTileCanvas.width = displayConfig.width;
-    this.nextTileCanvas.height = displayConfig.height;
-    this.nextTileCtx = this.nextTileCanvas.getContext('2d');
-
-    container.appendChild(this.nextTileLabel);
-    container.appendChild(this.nextTileCanvas);
-    this.nextTileContainer.appendChild(container);
   }
 
   /**
@@ -369,31 +366,6 @@ export default class UIManager {
   }
 
   /**
-   * Updates the "Next Tile" icon by redrawing it.
-   * @param {string|null} tileId The ID of the tile in the player's hand.
-   */
-  updateNextTile(tileId) {
-    const ctx = this.nextTileCtx;
-    const canvas = this.nextTileCanvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (!tileId) return;
-
-    const hexSize = Config.UIConfig.nextTileDisplay.hexSize;
-    const cx = canvas.width / 2;  
-    const cy = canvas.height / 2;
-
-    // Draw a generic background tile for the icon.
-    this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Savannah color as a neutral background.
-
-    // Find the building's definition in the library and use the new utility to draw it.
-    const buildingDefinition = BuildingDefinitionMap.get(tileId);
-    if (buildingDefinition?.draw) {
-      DrawingUtils.drawDetails(ctx, buildingDefinition, cx, cy, hexSize);
-    }
-  }
-
-  /**
    * Draws a single hexagon at a given center point.
    * @param {CanvasRenderingContext2D} ctx The rendering context.
    * @param {number} cx The center x-coordinate.
@@ -422,5 +394,87 @@ export default class UIManager {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  }
+
+  /**
+   * Draws a preview of a single tile onto a given canvas.
+   * @param {CanvasRenderingContext2D} ctx The rendering context.
+   * @param {HTMLCanvasElement} canvas The canvas to draw on.
+   * @param {string} tileId The ID of the building to draw.
+   * @private
+   */
+  _drawTilePreview(ctx, canvas, tileId) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const hexSize = Math.min(canvas.width, canvas.height) / 2 * 0.85;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // Draw a generic background tile for the icon.
+    this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Steppe color as a neutral background.
+
+    // Find the building's definition in the library and use the new utility to draw it.
+    const buildingDefinition = BuildingDefinitionMap.get(tileId);
+    if (buildingDefinition?.draw) {
+      DrawingUtils.drawDetails(ctx, buildingDefinition, cx, cy, hexSize);
+    }
+  }
+
+  /**
+   * Updates both the "Current Tile" and "Next Tile" previews.
+   * This function reads directly from the player's state.
+   */
+  updateTilePreviews() {
+    if (!this.player) return;
+
+    const currentTileId = this.player.currentTileInHand;
+    // The "next" tile is the one at the top of the deck (which is the end of the array because of pop())
+    const nextTileId = this.player.deck.length > 0 ? this.player.deck[this.player.deck.length - 1] : null;
+
+    // Draw the current tile being placed
+    if (currentTileId) {
+      this._drawTilePreview(this.currentTileCtx, this.currentTileCanvas, currentTileId);
+      const buildingDef = BuildingDefinitionMap.get(currentTileId);
+      this.currentTileNameDiv.textContent = buildingDef?.name || '';
+    } else {
+      // If there's no current tile, the game is likely over.
+      drawEndIndicator(this.currentTileCanvas);
+      this.currentTileNameDiv.textContent = '';
+    }
+
+    // Draw the upcoming tile
+    if (nextTileId) {
+      this._drawTilePreview(this.nextTileCtx, this.nextTileCanvas, nextTileId);
+      const buildingDef = BuildingDefinitionMap.get(nextTileId);
+      this.nextTileNameDiv.textContent = buildingDef?.name || '';
+    } else {
+      // If there's no next tile, the deck is empty.
+      drawEndIndicator(this.nextTileCanvas);
+      this.nextTileNameDiv.textContent = '';
+    }
+  }
+
+  /**
+   * Updates the tile counter display with the total and breakdown of tiles remaining in the deck.
+   */
+  updateTileCounter() {
+    if (!this.player) return;
+
+    const deck = this.player.deck;
+    const totalCount = deck.length;
+
+    // Use reduce to get the breakdown in a single pass, initializing with the keys we care about.
+    const breakdown = deck.reduce((acc, tileId) => {
+      if (acc.hasOwnProperty(tileId)) {
+        acc[tileId]++;
+      }
+      return acc;
+    }, { 'Industry': 0, 'Residence': 0, 'Road': 0 });
+
+    // Update the DOM elements
+    this.totalTilesCountSpan.textContent = totalCount;
+    this.industryTilesCountSpan.textContent = breakdown['Industry'];
+    this.residenceTilesCountSpan.textContent = breakdown['Residence'];
+    this.roadTilesCountSpan.textContent = breakdown['Road'];
   }
 }

@@ -1,2 +1,3 @@
-finish implementing all residence and industry types - you have a google doc with this stuff in it
-start to implement food/pop
+- show transformation on mouseover, with green/red highlight for score
+- end game
+- hand count and "next"
