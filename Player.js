@@ -81,8 +81,9 @@ export default class Player {
       this.currentTileInHand = this.deck.pop(); // Draw from the end (more efficient).
     } else {
       // Main deck is empty.
-      console.warn('Player deck is empty. Cannot draw a new tile.');
       this.currentTileInHand = null;
+      // Announce that the game is over because the player has no more tiles.
+      this.eventEmitter.emit('GAME_OVER');
     }
     this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }

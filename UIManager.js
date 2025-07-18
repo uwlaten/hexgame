@@ -54,6 +54,7 @@ export default class UIManager {
     this.roadTilesCountSpan = null;
     this.currentTileNameDiv = null;
     this.nextTileNameDiv = null;
+    this.gameOverPopup = null;
   }
 
   /**
@@ -64,6 +65,7 @@ export default class UIManager {
     this._createSeedInput();
     this._createNewGameButton();
     this._createScoreDisplay();
+    this._createGameOverPopup();
     this._createTooltipDisplay();
 
     // Get references to the tile preview canvases from the HTML
@@ -88,6 +90,14 @@ export default class UIManager {
       this.updateTilePreviews();
       this.updateTileCounter();
     });
+    this.eventEmitter.on('GAME_OVER', () => {
+      // Use a minimal timeout to push this to the end of the event queue,
+      // ensuring the final map render has completed before showing the popup.
+      setTimeout(() => this.showGameOverPopup(), 100);
+    });
+    // Also listen for a new game request to hide the popup if it's open.
+    this.eventEmitter.on('NEW_GAME_REQUESTED', () => this.hideGameOverPopup());
+
     this.eventEmitter.on('HEX_HOVERED', payload => {
       const { tile } = payload;
       let placementInfo = null;
@@ -292,6 +302,48 @@ export default class UIManager {
   }
 
   /**
+   * Creates the "Game Over" modal popup and appends it to the body.
+   * It is initially hidden.
+   * @private
+   */
+  _createGameOverPopup() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'none'; // Initially hidden
+
+    const content = document.createElement('div');
+    content.className = 'modal-content';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Game Over';
+
+    const scoreText = document.createElement('p');
+    scoreText.id = 'final-score-text'; // To easily update it
+
+    const newGameBtn = document.createElement('button');
+    newGameBtn.textContent = 'Play Again';
+    newGameBtn.addEventListener('click', () => {
+      this.hideGameOverPopup();
+      this.eventEmitter.emit('NEW_GAME_REQUESTED');
+    });
+
+    content.append(title, scoreText, newGameBtn);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    this.gameOverPopup = overlay;
+  }
+
+  /**
+   * Hides the game over popup.
+   */
+  hideGameOverPopup() {
+    if (this.gameOverPopup) {
+      this.gameOverPopup.style.display = 'none';
+    }
+  }
+
+  /**
    * Updates the score text content.
    * @param {number} score The new score.
    */
@@ -381,6 +433,18 @@ export default class UIManager {
         // This condition isolates the 'mouse off' case.
         this.tooltipContainer.style.display = 'none';
     }
+  }
+
+  /**
+   * Displays the game over popup with the final score.
+   */
+  showGameOverPopup() {
+    if (!this.gameOverPopup || !this.player) return;
+
+    const scoreText = this.gameOverPopup.querySelector('#final-score-text');
+    scoreText.textContent = `Your final score is: ${this.player.score}`;
+
+    this.gameOverPopup.style.display = 'flex';
   }
 
   /**
