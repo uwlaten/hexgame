@@ -112,6 +112,23 @@ export default class PlacementResolver {
         const tempBuilding = new Building(transform.id);
         clonedTile.setContent(tempBuilding);
 
+        // --- Simulate resource claim for scoring ---
+        // This is crucial for the ClaimedResourceScoreRule to work during hypothetical checks.
+        const buildingDef = BuildingDefinitionMap.get(transform.id);
+        const resourceToClaim = buildingDef?.claimsResource;
+        if (resourceToClaim) {
+          const neighbors = HexGridUtils.getNeighbors(targetTile.x, targetTile.y);
+          for (const coord of neighbors) {
+            const neighborTile = map.getTileAt(coord.x, coord.y);
+            if (neighborTile?.contentType instanceof Resource &&
+                neighborTile.contentType.type === resourceToClaim &&
+                !neighborTile.contentType.isClaimed) {
+              tempBuilding.claimedResourceTile = neighborTile; // Set the link on the temporary building.
+              break; // A building only claims one resource.
+            }
+          }
+        }
+
         // Calculate score on the cloned, modified tile. The original tile is untouched.
         const score = ScoringEngine.calculateScoreFor(transform.id, clonedTile, map);
         outcomes.push({ id: transform.id, isNegative: transform.isNegative || false, score });

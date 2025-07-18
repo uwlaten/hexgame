@@ -28,20 +28,24 @@ export const BuildingLibrary = {
     // each transformation needs a 'reason'. Optionally a 'score' to override the default.
     // To override the score for claiming a resource, provide 'claimScore'.
     transformations: [
+      // --- Mining Group (most specific first) ---
       {
-        id: 'Mine',
-        conditions: [{ type: 'feature', id: 'hills' }],
-        reason: 'Built a mine',
+        id: 'GoldMine',
+        conditions: [{ type: 'adjacentToResource', id: 'Gold', claimed: false }],
+        reason: 'Built a Gold Mine',
+        claimReason: 'Claimed nearby Gold deposit',
       },
       {
         id: 'IronMine',
         conditions: [{ type: 'adjacentToResource', id: 'Iron', claimed: false }],
         reason: 'Built an Iron Mine',
+        claimReason: 'Claimed nearby Iron deposit',
       },
       {
-        id: 'GoldMine',
-        conditions: [{ type: 'adjacentToResource', id: 'Gold', claimed: false }],
-        reason: 'Built a Gold Mine',
+        id: 'Quarry',
+        conditions: [{ type: 'adjacentToResource', id: 'Stone', claimed: false }],
+        reason: 'Built a quarry',
+        claimReason: 'Claimed nearby Stone',
       },
       {
         id: 'Stonecutter',
@@ -49,16 +53,11 @@ export const BuildingLibrary = {
         reason: 'Built a stonecutter',
       },
       {
-        id: 'Quarry',
-        conditions: [{ type: 'adjacentToResource', id: 'Stone', claimed: false }],
-        reason: 'Built a quarry',
+        id: 'Mine',
+        conditions: [{ type: 'feature', id: 'hills' }],
+        reason: 'Built a mine',
       },
-
-      {
-        id: 'Woodcutter',
-        conditions: [{ type: 'feature', id: 'forest' }],
-        reason: 'Built a woodcutter',
-      },
+      // --- Forestry Group ---
       {
         id: 'Lumbermill',
         conditions: [
@@ -66,43 +65,55 @@ export const BuildingLibrary = {
           { type: 'adjacentToResource', id: 'Wood', claimed: false },
         ],
         reason: 'Built a Lumbermill',
+        claimReason: 'Claimed nearby Wood',
       },
       {
-        id: 'Croft',
-        conditions: [
-          { type: 'onBiome', id: 'plains'  },
-          { type: 'adjacentToRiver'},
-        ], 
-        reason: 'Built a croft',
+        id: 'Woodcutter',
+        conditions: [{ type: 'feature', id: 'forest' }],
+        reason: 'Built a woodcutter',
       },
+      // --- Farming Group ---
       {
         id: 'Farm',
         conditions: [
           { type: 'adjacentToResource', id: 'Grain', claimed: false },
           { type: 'onBiome', id: 'plains' },
           { type: 'adjacentToRiver' }, // might want to relax this to just grain and plains
-        ], 
+        ],
         reason: 'Built a Farm',
+        claimReason: 'Claimed nearby Grain',
+      },
+      {
+        id: 'Croft',
+        conditions: [
+          { type: 'onBiome', id: 'plains'  },
+          { type: 'adjacentToRiver'},
+        ],
+        reason: 'Built a croft',
+      },
+      // --- Fishing Group ---
+      {
+        id: 'Fishery',
+        conditions: [{ type: 'adjacentToResource', id: 'Fish', claimed: false }],
+        reason: 'Built a Fishery',
+        claimReason: 'Claimed nearby Fish',
       },
       {
         id: 'FishingHut',
         conditions: [{ type: 'adjacentToBiome', id: ['ocean', 'lake']}],
         reason: 'Built a fishing hut',
       },
+      // --- Herding Group ---
       {
-        id: 'Fishery',
-        conditions: [{ type: 'adjacentToResource', id: 'Fish', claimed: false }],
-        reason: 'Built a Fishery',
+        id: 'CattleFarm',
+        conditions: [{ type: 'adjacentToResource', id: 'Cattle', claimed: false }],
+        reason: 'Built a Cattle Farm',
+        claimReason: 'Claimed nearby Cattle',
       },
       {
         id: 'HerdersHut',
         conditions: [{ type: 'onBiome', id: 'steppe'}],
         reason: 'Built a herder\'s hut',
-      },
-      {
-        id: 'CattleFarm',
-        conditions: [{ type: 'adjacentToResource', id: 'Cattle', claimed: false }],
-        reason: 'Built a Cattle Farm',
       },
 
     ],
@@ -277,6 +288,144 @@ export const BuildingLibrary = {
       ],
     },
   },
+  GOLD_MINE: {
+    id: 'GoldMine',
+    name: 'Gold Mine',
+    baseId: 'Industry',
+    claimsResource: 'Gold',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#A9A9A9', params: [ [-0.3, -0.3], [0.3, -0.3], [0.4, 0.3], [-0.4, 0.3] ] },
+        { type: 'polygon', fillStyle: '#FFD700', params: [ [-0.2, -0.1], [0.2, -0.1], [0.25, 0.05], [0.1, 0.2], [-0.1, 0.2], [-0.25, 0.05] ] },
+      ],
+    },
+  },
+  STONECUTTER: {
+    id: 'Stonecutter',
+    name: 'Stonecutter',
+    baseId: 'Industry',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#A9A9A9', params: [ [-0.3, -0.3], [0.3, -0.3], [0.4, 0.3], [-0.4, 0.3] ] },
+        { type: 'rect', fillStyle: '#808080', params: [ -0.25, -0.1, 0.1, 0.4 ] }, // Chisel handle
+        { type: 'polygon', fillStyle: '#C0C0C0', params: [ [-0.3, -0.1], [-0.2, -0.2], [-0.1, -0.1] ] }, // Chisel head
+      ],
+    },
+  },
+  WOODCUTTER: {
+    id: 'Woodcutter',
+    name: 'Woodcutter',
+    baseId: 'Industry',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#A9A9A9', params: [ [-0.3, -0.3], [0.3, -0.3], [0.4, 0.3], [-0.4, 0.3] ] },
+        { type: 'polygon', fillStyle: '#8B4513', params: [ [-0.2, 0.2], [-0.1, 0.3], [0.3, -0.1], [0.2, -0.2] ] }, // Axe handle
+        { type: 'polygon', fillStyle: '#C0C0C0', params: [ [-0.3, 0.1], [-0.2, 0.2], [-0.1, 0.1], [-0.2, 0.0] ] }, // Axe head
+      ],
+    },
+  },
+  LUMBERMILL: {
+    id: 'Lumbermill',
+    name: 'Lumbermill',
+    baseId: 'Industry',
+    claimsResource: 'Wood',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#A9A9A9', params: [ [-0.3, -0.3], [0.3, -0.3], [0.4, 0.3], [-0.4, 0.3] ] },
+        { type: 'circle', fillStyle: '#C0C0C0', strokeStyle: '#696969', lineWidth: 1, params: [0, 0, 0.2] }, // Saw blade
+      ],
+    },
+  },
+  CROFT: {
+    id: 'Croft',
+    name: 'Croft',
+    baseId: 'Industry',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'rect', fillStyle: '#DEB887', params: [-0.3, -0.2, 0.6, 0.4] }, // Building base
+        { type: 'polygon', fillStyle: '#A0522D', params: [ [-0.35, -0.2], [0.35, -0.2], [0, -0.4] ] }, // Roof
+      ],
+    },
+  },
+  FARM: {
+    id: 'Farm',
+    name: 'Farm',
+    baseId: 'Industry',
+    claimsResource: 'Grain',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'rect', fillStyle: '#DEB887', params: [-0.4, -0.2, 0.8, 0.5] }, // Larger building base
+        { type: 'polygon', fillStyle: '#A0522D', params: [ [-0.45, -0.2], [0.45, -0.2], [0, -0.5] ] }, // Larger roof
+      ],
+    },
+  },
+  FISHING_HUT: {
+    id: 'FishingHut',
+    name: 'Fishing Hut',
+    baseId: 'Industry',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#D2B48C', params: [ [-0.3, 0.2], [0.3, 0.2], [0, -0.2] ] }, // Simple hut
+        { type: 'polygon', fillStyle: '#4682B4', params: [ [-0.1, -0.3], [0.1, -0.3], [0, -0.4] ] }, // Fish icon
+      ],
+    },
+  },
+  FISHERY: {
+    id: 'Fishery',
+    name: 'Fishery',
+    baseId: 'Industry',
+    claimsResource: 'Fish',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'rect', fillStyle: '#B0C4DE', params: [-0.4, -0.2, 0.8, 0.4] }, // Building base
+        { type: 'circle', strokeStyle: '#FFFFFF', lineWidth: 1, params: [0, 0, 0.25] }, // Net
+      ],
+    },
+  },
+  HERDERS_HUT: {
+    id: 'HerdersHut',
+    name: 'Herders Hut',
+    baseId: 'Industry',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'circle', fillStyle: '#F5DEB3', params: [0, 0, 0.3] }, // Yurt shape
+        { type: 'polygon', fillStyle: '#DAA520', params: [ [-0.3, 0], [0.3, 0], [0, -0.3] ] }, // Conical roof
+      ],
+    },
+  },
+  CATTLE_FARM: {
+    id: 'CattleFarm',
+    name: 'Cattle Farm',
+    baseId: 'Industry',
+    claimsResource: 'Cattle',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'rect', fillStyle: '#FFFFFF', params: [-0.3, -0.2, 0.6, 0.4] }, // White barn
+        { type: 'rect', fillStyle: '#000000', params: [-0.2, -0.1, 0.1, 0.1] }, // Black spot
+        { type: 'rect', fillStyle: '#000000', params: [0.1, 0.0, 0.15, 0.1] }, // Black spot
+      ],
+    },
+  },
 
   // --- Residence Transformations ---
   POLLUTED_SLUM: {
@@ -289,6 +438,76 @@ export const BuildingLibrary = {
       shapes: [
         { type: 'polygon', fillStyle: '#556B2F', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
         { type: 'rect', fillStyle: '#A9A9A9', params: [-0.15, 0, 0.1, 0.2] },
+      ],
+    },
+  },
+  NOISY_HOMES: {
+    id: 'NoisyHomes',
+    name: 'Noisy Homes',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#696969', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'rect', fillStyle: '#A9A9A9', params: [-0.15, 0, 0.1, 0.2] },
+        // Sound waves
+        { type: 'arc', strokeStyle: '#FFFFFF', lineWidth: 1, params: [0, 0, 0.2, -0.5, 0.5] },
+        { type: 'arc', strokeStyle: '#FFFFFF', lineWidth: 1, params: [0, 0, 0.3, -0.5, 0.5] },
+      ],
+    },
+  },
+  ARID_ABODES: {
+    id: 'AridAbodes',
+    name: 'Arid Abodes',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#D2B48C', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'rect', fillStyle: '#8B4513', params: [-0.15, 0, 0.1, 0.2] },
+      ],
+    },
+  },
+  FRIGID_HAMLET: {
+    id: 'FrigidHamlet',
+    name: 'Frigid Hamlet',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#B0E0E6', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'polygon', fillStyle: '#FFFFFF', params: [ [-0.35, -0.1], [0.35, -0.1], [0, -0.5] ] }, // Snow on roof
+      ],
+    },
+  },
+  WILDERNESS_HUTS: {
+    id: 'WildernessHuts',
+    name: 'Wilderness Huts',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        { type: 'polygon', fillStyle: '#8B4513', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'rect', fillStyle: '#A0522D', params: [-0.15, 0, 0.1, 0.2] },
+      ],
+    },
+  },
+  FARMSTEAD: {
+    id: 'Farmstead',
+    name: 'Farmstead',
+    baseId: 'Residence',
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // A simple, clean farmhouse
+        { type: 'polygon', fillStyle: '#F5DEB3', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
+        { type: 'rect', fillStyle: '#A0522D', params: [-0.1, 0.1, 0.2, 0.2] }, // Door
+        { type: 'polygon', fillStyle: '#8B0000', params: [ [-0.35, -0.1], [0.35, -0.1], [0, -0.5] ] }, // Red roof
       ],
     },
   },

@@ -165,8 +165,8 @@ export default {
     // The building IDs that the player starts with in their deck.
     initialHand: ['CityCentre'],
     mainDeck: {
-      Industry: 10,
-      Residence: 50,
+      Industry: 20,
+      Residence: 20,
       Road: 2,
     },
     initialDeckSize: 15,
