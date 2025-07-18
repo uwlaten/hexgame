@@ -187,7 +187,10 @@ export const BuildingLibrary = {
       },
       {
         id: 'DesertHub',
-        conditions: [{ type: 'adjacentToFeature', id: 'oasis' }],
+        conditions: [
+          { type: 'adjacentToFeature', id: 'oasis' },
+          { type: 'onBiome', id: 'desert' },
+        ],
         reason: 'Built by the oasis',
       },
       {

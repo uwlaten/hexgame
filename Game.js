@@ -176,7 +176,7 @@ export default class Game {
     const notificationMessages = [];
 
     // 1. Process unique tile reward
-    if (resourceDef.uniqueTileReward) {
+    if (Config.RewardConfig.enableUniqueTileRewards && resourceDef.uniqueTileReward) {
       tilesToAward.push(resourceDef.uniqueTileReward);
       const tileDef = BuildingDefinitionMap.get(resourceDef.uniqueTileReward);
       notificationMessages.push(`+1 ${tileDef?.name || resourceDef.uniqueTileReward}`);

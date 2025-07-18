@@ -165,9 +165,9 @@ export default {
     // The building IDs that the player starts with in their deck.
     initialHand: ['CityCentre'],
     mainDeck: {
-      Industry: 15,
-      Residence: 15,
-      Road: 3,
+      Industry: 11,
+      Residence: 11,
+      Road: 2,
     },
     initialDeckSize: 15,
 
@@ -207,34 +207,42 @@ export default {
    * Holds all tunable parameters for resource claim rewards.
    */
   RewardConfig: {
+    /**
+     * A master switch to enable or disable unique tile rewards (e.g., Forge, Bakery)
+     * from claiming resources. Set to false to only receive bundle rewards.
+     */
+    enableUniqueTileRewards: false,
+
     // This is the master list of all reward bundles.
     bundles: {
       // The default bundle, used if a resource doesn't specify one.
       default: {
-        message: "+2 Tiles", // Message part for this bundle
-        count: 2,            // Number of random tiles to award
+        message: "+5 Tiles", // Message part for this bundle
+        count: 5,            // Number of random tiles to award
         pool: [              // Weighted pool for random selection
-          { id: 'Industry', weight: 1 },
-          { id: 'Residence', weight: 1 },
+          { id: 'Industry', weight: 5 },
+          { id: 'Residence', weight: 5 },
           { id: 'Road', weight: 1 }
         ]
       },
       // A specific bundle for industrial resources.
       IndustryBundle: {
-        message: "+2 Industrial Tiles",
-        count: 2,
+        message: "+5 Tiles",
+        count: 5,
         pool: [
-          { id: 'Industry', weight: 7 },
-          { id: 'Road', weight: 3 }
+          { id: 'Industry', weight: 10 },
+          { id: 'Residence', weight: 5 },
+          { id: 'Road', weight: 1 }
         ]
       },
       // A specific bundle for residential/food resources.
       ResidentialBundle: {
-        message: "+2 Residential Tiles",
-        count: 2,
+        message: "+5 Tiles",
+        count: 5,
         pool: [
-          { id: 'Residence', weight: 8 },
-          { id: 'Road', weight: 2 }
+          { id: 'Industry', weight: 5 },
+          { id: 'Residence', weight: 10 },
+          { id: 'Road', weight: 1 }
         ]
       }
     }
