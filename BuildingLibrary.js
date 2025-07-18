@@ -25,31 +25,39 @@ export const BuildingLibrary = {
     id: 'Industry',
     name: 'Industry',
     transformModel: 'exclusive', // Chooses the single best transformation.
+    // each transformation needs a 'reason'. Optionally a 'score' to override the default.
+    // To override the score for claiming a resource, provide 'claimScore'.
     transformations: [
       {
         id: 'Mine',
         conditions: [{ type: 'feature', id: 'hills' }],
+        reason: 'Built a mine',
       },
       {
         id: 'IronMine',
         conditions: [{ type: 'adjacentToResource', id: 'Iron', claimed: false }],
+        reason: 'Built an Iron Mine',
       },
       {
         id: 'GoldMine',
         conditions: [{ type: 'adjacentToResource', id: 'Gold', claimed: false }],
+        reason: 'Built a Gold Mine',
       },
       {
         id: 'Stonecutter',
-        conditions: [{ type: 'adjacentToBiome', id: 'mountain' }], //how do we choose between multiple options
+        conditions: [{ type: 'adjacentToBiome', id: 'mountain' }], //multiple equivalent options decided based on priority - higher on the list = first
+        reason: 'Built a stonecutter',
       },
       {
         id: 'Quarry',
         conditions: [{ type: 'adjacentToResource', id: 'Stone', claimed: false }],
+        reason: 'Built a quarry',
       },
 
       {
         id: 'Woodcutter',
         conditions: [{ type: 'feature', id: 'forest' }],
+        reason: 'Built a woodcutter',
       },
       {
         id: 'Lumbermill',
@@ -57,6 +65,7 @@ export const BuildingLibrary = {
           { type: 'feature', id: 'forest' },
           { type: 'adjacentToResource', id: 'Wood', claimed: false },
         ],
+        reason: 'Built a Lumbermill',
       },
       {
         id: 'Croft',
@@ -64,6 +73,7 @@ export const BuildingLibrary = {
           { type: 'onBiome', id: 'plains'  },
           { type: 'adjacentToRiver'},
         ], 
+        reason: 'Built a croft',
       },
       {
         id: 'Farm',
@@ -72,22 +82,27 @@ export const BuildingLibrary = {
           { type: 'onBiome', id: 'plains' },
           { type: 'adjacentToRiver' }, // might want to relax this to just grain and plains
         ], 
+        reason: 'Built a Farm',
       },
       {
         id: 'FishingHut',
         conditions: [{ type: 'adjacentToBiome', id: ['ocean', 'lake']}],
+        reason: 'Built a fishing hut',
       },
       {
         id: 'Fishery',
         conditions: [{ type: 'adjacentToResource', id: 'Fish', claimed: false }],
+        reason: 'Built a Fishery',
       },
       {
         id: 'HerdersHut',
         conditions: [{ type: 'onBiome', id: 'steppe'}],
+        reason: 'Built a herder\'s hut',
       },
       {
         id: 'CattleFarm',
         conditions: [{ type: 'adjacentToResource', id: 'Cattle', claimed: false }],
+        reason: 'Built a Cattle Farm',
       },
 
     ],
@@ -111,11 +126,13 @@ export const BuildingLibrary = {
         id: 'PollutedSlum',
         isNegative: true,
         conditions: [{ type: 'adjacentToBuilding', id: ['Mine', 'IronMine', 'GoldMine'] }],
+        reason: 'Built next to a mine',
       },
       {
         id: 'NoisyHomes',
         isNegative: true,
         conditions: [{ type: 'adjacentToBuilding', id: ['Quarry', 'Lumbermill'] }],
+        reason: 'Built next to a noisy neighbour',
       },
       {
         id: 'AridAbodes',
@@ -124,50 +141,61 @@ export const BuildingLibrary = {
           { type: 'onBiome', id: 'desert' },
           { type: 'adjacentToFeature', id: 'oasis', invert: true},//and not adjacent to oasis
         ], 
+        reason: 'Built far from water',
       },
       {
         id: 'FrigidHamlet',
         isNegative: true,
         conditions: [{ type: 'onBiome', id: 'tundra' }],
+        reason: 'Built in the wasteland',
       },
       {
         id: 'WildernessHuts',
         isNegative: true,
         conditions: [{ type: 'feature', id: 'forest' }],
+        reason: 'Built on uncleared land',
       },
       // Positive bonuses.
       {
         id: 'HilltopVilla',
         conditions: [{ type: 'feature', id: 'hills' }],
+        reason: 'Built with beautiful views',
       },
       {
         id: 'RiversideHome',
         conditions: [{ type: 'adjacentToRiver' }],
+        reason: 'Built on the riverbank',
       },
       {
         id: 'DesertHub',
         conditions: [{ type: 'adjacentToFeature', id: 'oasis' }],
+        reason: 'Built by the oasis',
       },
       {
         id: 'SeafrontHomes',
         conditions: [{ type: 'adjacentToBiome', id: 'ocean' }],
+        reason: 'Built on the coast',
       },    
       {
         id: 'LakeLodges',
         conditions: [{ type: 'adjacentToBiome', id: 'lake' }],
+        reason: 'Built on the lakeside',
       },   
       {
         id: 'WoodlandRetreat',
         conditions: [{ type: 'adjacentToFeature', id: 'forest' }],
+        reason: 'Built near the woods',
        },
       {
         id: 'MountainViews',
         conditions: [{ type: 'adjacentToBiome', id: 'mountain' }],
+        reason: 'Built near spectacular views',
       },   
-//      {
- //       id: 'Farmstead',
-  //      conditions: [{ type: 'adjacentToBuilding', id: ['Croft', 'Farm'] }],
-  //    },   
+      {
+        id: 'Farmstead',
+        conditions: [{ type: 'adjacentToBuilding', id: ['Croft', 'Farm'] }],
+        reason: 'Built homes for the farmers',
+      },   
     ],
     draw: {
       type: 'shapes',
@@ -190,6 +218,7 @@ export const BuildingLibrary = {
           { type: 'onBiome', id: ['ocean', 'lake'] },
           { type: 'neighbor', property: 'biome.isBuildable', value: true, operator: 'atLeast', count: 2 },
         ],
+        reason: 'Built across water',
       },
     ],
     draw: {

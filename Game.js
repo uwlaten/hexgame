@@ -137,8 +137,12 @@ export default class Game {
       if (neighborTile?.contentType instanceof Resource &&
           neighborTile.contentType.type === resourceToClaim &&
           !neighborTile.contentType.isClaimed) {
+        // Set the resource as claimed to prevent others from taking it.
         neighborTile.contentType.isClaimed = true;
-        
+        // Create the explicit, two-way data link between the building and the resource.
+        building.claimedResourceTile = neighborTile;
+        neighborTile.contentType.claimedBy = building;
+
         // Add the pair of tiles (Industry and Resource) to the renderer's outline list.
         this.renderer.addOutlinedGroup([tile, neighborTile]);
 

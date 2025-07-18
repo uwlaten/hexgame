@@ -51,204 +51,82 @@ export class BasePlacementScore extends ScoringRule {
   }
 }
 
-
-
-
 /**
- * Score for placing a Mine.
+ * A generic rule that awards points for any valid building transformation.
+ * It reads the score and reason directly from the transformation's definition
+ * in BuildingLibrary.js, with sensible defaults.
  */
-export class MineScoringRule extends ScoringRule{
+export class TransformationScoreRule extends ScoringRule {
   evaluate(tile, buildingId, map) {
-    const isMine = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.MINE.id;
+    const building = tile.contentType;
+    if (!(building instanceof Building)) return [];
 
-    return [{
-      rule: "MineScoringRule",
-      reason: "Mine placed",
-      points: isMine ? 1 : 0,
-    }];
-  }
-}
-
-/**
- * Score for placing an Iron Mine, including resource claim.
- */
-export class IronMineScoringRule extends ScoringRule{
-  evaluate(tile, buildingId, map) {
-    const isIronMine = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.IRON_MINE.id;
-
-    const isAdjacentToIron = isIronMine && HexGridUtils.getNeighbors(tile.x, tile.y).some(coord => {
-      const neighbor = tile.map.getTileAt(coord.x, coord.y);
-      return neighbor?.contentType instanceof Resource &&
-             neighbor.contentType.type === 'Iron' &&
-             !neighbor.contentType.isClaimed;
-    });
-
-    const breakdown = [];
-    if (isIronMine) {
-      breakdown.push({
-        rule: "IronMineScoringRule",
-        reason: "Iron Mine placed",
-        points: 1,
-      });
-      if (isAdjacentToIron) {
-        breakdown.push({
-          rule: "IronMineScoringRule",
-          reason: "Adjacent to unclaimed Iron",
-          points: 1,
-        });
-      }
+    const buildingDef = BuildingDefinitionMap.get(building.type);
+    // This rule only applies to transformed buildings which have a baseId.
+    if (!buildingDef || !buildingDef.baseId) {
+      return [];
     }
 
-    return breakdown;
-  }
-}
-
-/**
- * Score for placing a Quarry, including resource claim.
- */
-export class QuarryScoringRule extends ScoringRule{
-  evaluate(tile, buildingId, map) {
-    const isQuarry = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.QUARRY.id;
-
-    const isAdjacentToStone = isQuarry && HexGridUtils.getNeighbors(tile.x, tile.y).some(coord => {
-      const neighbor = tile.map.getTileAt(coord.x, coord.y);
-      return neighbor?.contentType instanceof Resource &&
-             neighbor.contentType.type === 'Stone' &&
-             !neighbor.contentType.isClaimed;
-    });
-
-    const breakdown = [];
-    if (isQuarry) {
-      breakdown.push({
-        rule: "QuarryScoringRule",
-        reason: "Quarry placed",
-        points: 1,
-      });
-      if (isAdjacentToStone) {
-        breakdown.push({
-          rule: "QuarryScoringRule",
-          reason: "Adjacent to unclaimed Stone",
-          points: 1,
-        });
-      }
+    // The LuxuryHome has its own complex scoring rule, so we let that rule handle it exclusively.
+    if (building.type === BuildingLibrary.LUXURY_HOME.id) {
+      return [];
     }
-    return breakdown;
-  }
-}
 
-/**
- * Score for placing a Polluted Slum (negative score).
- */
-export class PollutedSlumScoringRule extends ScoringRule{
-  evaluate(tile, buildingId, map) {
-    const isPollutedSlum = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.POLLUTED_SLUM.id;
+    const baseBuildingDef = BuildingDefinitionMap.get(buildingDef.baseId);
+    const transformation = baseBuildingDef?.transformations.find(t => t.id === building.type);
+
+    if (!transformation) return [];
+
+    const isNegative = transformation.isNegative || false;
+    let score = transformation.score;
+
+    // Apply default scores if not specified in the library.
+    if (score === undefined) {
+      score = isNegative ? -2 : 1;
+    }
+
+    if (score === 0) return [];
+
+    const reason = transformation.reason || (isNegative ? 'Negative transformation' : 'Valid transformation');
 
     return [{
-      rule: "PollutedSlumScoringRule",
-      reason: "Negative transformation to Polluted Slum",
-      points: isPollutedSlum ? -2 : 0,
+      rule: 'TransformationScoreRule',
+      reason: reason,
+      points: score,
     }];
   }
 }
 
 /**
- * Score for placing a Hilltop Villa.
+ * A generic rule that awards points for an Industry building claiming a resource.
+ * It checks for the data link between the building and the resource tile.
  */
-export class HilltopVillaScoringRule extends ScoringRule{
+export class ClaimedResourceScoreRule extends ScoringRule {
   evaluate(tile, buildingId, map) {
-    const isHilltopVilla = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.HILLTOP_VILLA.id;
+    const building = tile.contentType;
+    // 1. Check if it's a building and if it has claimed a resource.
+    // The `claimedResourceTile` property is our proof of a successful claim.
+    if (!(building instanceof Building) || !building.claimedResourceTile) {
+      return [];
+    }
 
-    return [{
-      rule: "HilltopVillaScoringRule",
-      reason: "Positive transformation to Hilltop Villa",
-      points: isHilltopVilla ? 1 : 0,
-    }];
-  }
-}
+    // 2. Find the transformation definition to get scoring data.
+    const buildingDef = BuildingDefinitionMap.get(building.type);
+    if (!buildingDef || !buildingDef.baseId) {
+      return [];
+    }
+    const baseBuildingDef = BuildingDefinitionMap.get(buildingDef.baseId);
+    const transformation = baseBuildingDef?.transformations.find(t => t.id === building.type);
 
-/**
- * Score for placing a Riverfront Home.
- */
-export class RiversideHomeScoringRule extends ScoringRule{
-  evaluate(tile, buildingId, map) {
-    const isRiversideHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.RIVERSIDE_HOME.id;
+    if (!transformation) return [];
 
-    return [{
-      rule: "RiversideHomeScoringRule",
-      reason: "Positive transformation to Riverside Home",
-      points: isRiversideHome ? 1 : 0,
-    }];
-  }
-}
+    // 3. Determine the score and reason, using defaults if not specified.
+    const score = transformation.claimScore ?? 1; // Default to +1 if claimScore is not defined.
+    const reason = transformation.claimReason || `Claimed nearby resource`;
 
-/**
- * Score for placing a Woodland Retreat.
- */
-export class WoodlandRetreatScoringRule extends  ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const isWoodlandRetreat = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.WOODLAND_RETREAT.id;
+    if (score === 0) return [];
 
-    return [{
-      rule: "WoodlandRetreatScoringRule",
-      reason: "Positive transformation to Woodland Retreat",
-      points: isWoodlandRetreat ? 1 : 0,
-    }];
-  }
-}
-
-/**
- * Score for placing a Desert Hub.
- */
-export class DesertHubScoringRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const isDesertHub = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.DESERT_HUB.id;
-    return [{
-      rule: "DesertHubScoringRule",
-      reason: "Positive transformation to Desert Hub",
-      points: isDesertHub ? 1 : 0,
-    }];
-  }
-}
-
-/**
- * Score for placing a Seafront Home.
- */
-export class SeafrontHomesScoringRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const isSeafrontHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.SEAFRONT_HOMES.id;
-    return [{
-      rule: "SeafrontHomesScoringRule",
-      reason: "Positive transformation to Seafront Home",
-      points: isSeafrontHome ? 1 : 0,
-    }];
-  }
-}
-
-/**
- * Score for placing a Lake Lodge.
- */
-export class LakeLodgesScoringRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const isLakeLodge = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.LAKE_LODGES.id;
-    return [{
-      rule: "LakeLodgesScoringRule",
-      reason: "Positive transformation to Lake Lodge",
-      points: isLakeLodge ? 1 : 0,
-    }];
-  }
-}
-
-/**
- * Score for placing a Mountain Views home.
- */
-export class MountainViewsScoringRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const isMountainViews = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.MOUNTAIN_VIEWS.id;
-    return [{
-      rule: "MountainViewsScoringRule",
-      reason: "Positive transformation to Mountain Views",
-      points: isMountainViews ? 1 : 0,
-    }];
+    return [{ rule: 'ClaimedResourceScoreRule', reason, points: score }];
   }
 }
 
@@ -269,7 +147,8 @@ export class LuxuryHomeScoringRule extends ScoringRule{
     // 2. Count how many transformations are valid on this tile.
     let validBonusCount = 0;
     for (const transform of positiveTransformations) {
-      if (PlacementResolver._checkConditions(tile, transform.conditions, map)) {
+      // Pass an empty context object {} to prevent errors in _checkConditions.
+      if (PlacementResolver._checkConditions(tile, transform.conditions, map, {})) {
         validBonusCount++;
       }
     }
@@ -283,39 +162,13 @@ export class LuxuryHomeScoringRule extends ScoringRule{
 }
 
 /**
- * Score for placing a Bridge.
- */
-export class BridgeScoringRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
-    const isBridge = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.BRIDGE.id;
-
-    return [{
-      rule: "BridgeScoringRule",
-      reason: "Bridge placed",
-      points: isBridge ? 1 : 0,
-    }];
-  }
-}
-
-
-/**
  * A single collection of all available scoring rule classes.
  * This allows the ScoringEngine to dynamically register all rules without
  * needing to know their specific names.
  */
 export const AllRules = {
   BasePlacementScore,
-  MineScoringRule,
-  IronMineScoringRule,
-  QuarryScoringRule,
-  PollutedSlumScoringRule,
-  HilltopVillaScoringRule,
-  RiversideHomeScoringRule,
-  WoodlandRetreatScoringRule,
-  DesertHubScoringRule,
-  SeafrontHomesScoringRule,
-  LakeLodgesScoringRule,
-  MountainViewsScoringRule,
-  BridgeScoringRule,
+  TransformationScoreRule,
+  ClaimedResourceScoreRule,
   LuxuryHomeScoringRule,
 };

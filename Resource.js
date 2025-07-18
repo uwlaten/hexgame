@@ -22,9 +22,21 @@ export class Resource {
      * @type {boolean}
      */
     this.isClaimed = false;
+
+    /**
+     * A reference to the Building instance that has claimed this resource.
+     * @type {import('./Building.js').Building|null}
+     */
+    this.claimedBy = null;
   }
 
   clone() {
-    return new Resource(this.type);
+    const newResource = new Resource(this.type);
+    // When cloning, we need to carry over the claimed state. This is important
+    // for hypothetical checks to know that a resource is already taken.
+    newResource.isClaimed = this.isClaimed;
+    // Also copy the reference to the claiming building.
+    newResource.claimedBy = this.claimedBy;
+    return newResource;
   }
 }
