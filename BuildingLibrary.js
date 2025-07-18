@@ -78,7 +78,9 @@ export const BuildingLibrary = {
         conditions: [
           { type: 'adjacentToResource', id: 'Grain', claimed: false },
           { type: 'onBiome', id: 'plains' },
-          { type: 'adjacentToRiver' }, // might want to relax this to just grain and plains
+          { type: 'adjacentToRiver' },
+          { type: 'feature', id: 'forest', invert: true }, 
+          { type: 'feature', id: 'hills', invert: true }, 
         ],
         reason: 'Built a Farm',
         claimReason: 'Claimed nearby Grain',
@@ -88,6 +90,8 @@ export const BuildingLibrary = {
         conditions: [
           { type: 'onBiome', id: 'plains'  },
           { type: 'adjacentToRiver'},
+          { type: 'feature', id: 'forest', invert: true }, 
+          { type: 'feature', id: 'hills', invert: true }, 
         ],
         reason: 'Built a croft',
       },
@@ -106,7 +110,11 @@ export const BuildingLibrary = {
       // --- Herding Group ---
       {
         id: 'CattleFarm',
-        conditions: [{ type: 'adjacentToResource', id: 'Cattle', claimed: false }],
+        conditions: [
+          { type: 'adjacentToResource', id: 'Cattle', claimed: false },
+          { type: 'feature', id: 'forest', invert: true }, 
+          { type: 'feature', id: 'hills', invert: true }, 
+        ],
         reason: 'Built a Cattle Farm',
         claimReason: 'Claimed nearby Cattle',
       },
