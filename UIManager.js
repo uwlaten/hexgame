@@ -6,7 +6,11 @@ import DrawingUtils from './DrawingUtils.js';
 import Config from './Config.js';
 import { BuildingLibrary, BuildingDefinitionMap } from './BuildingLibrary.js';
 import { Building } from './Building.js';
+import { Resource } from './Resource.js';
+import { ResourceLibrary } from './ResourceLibrary.js';
 import PlacementResolver from './PlacementResolver.js';
+import { renderContext } from './main.js';
+import { drawEndIndicator } from './ui/drawing.js';
 
 /**
  * Manages all HTML-based UI components. It creates the elements,
@@ -22,11 +26,17 @@ export default class UIManager {
     // These will be populated by the Game class after initialization.
     this.player = null;
     this.map = null;
+    this.renderer = null;
+
+    /**
+     * An array to keep track of active toast notifications.
+     * @type {HTMLElement[]}
+     */
+    this.activeNotifications = [];
 
     // Get references to the containers in the DOM.
     this.configPanelContainer = document.getElementById('config-panel');
     this.scoreContainer = document.getElementById('score-container');
-    this.nextTileContainer = document.getElementById('next-tile-container');
     this.tooltipContainer = null;
 
     // Create the elements that will be managed by this class.
@@ -38,11 +48,19 @@ export default class UIManager {
     this.waterOutput = null;
     this.mapSizeSlider = null;
     this.mapSizeOutput = null;
-    this.nextTileLabel = null;
+    this.currentTileCanvas = null;
+    this.currentTileCtx = null;
     this.nextTileCanvas = null;
     this.nextTileCtx = null;
     this.seedInput = null;
     this.randomSeedButton = null;
+    this.totalTilesCountSpan = null;
+    this.industryTilesCountSpan = null;
+    this.residenceTilesCountSpan = null;
+    this.roadTilesCountSpan = null;
+    this.currentTileNameDiv = null;
+    this.nextTileNameDiv = null;
+    this.gameOverPopup = null;
   }
 
   /**
@@ -53,13 +71,59 @@ export default class UIManager {
     this._createSeedInput();
     this._createNewGameButton();
     this._createScoreDisplay();
-    this._createNextTileDisplay();
+    this._createGameOverPopup();
     this._createTooltipDisplay();
+
+    // Get references to the tile preview canvases from the HTML
+    this.currentTileCanvas = document.getElementById('current-tile-canvas');
+    this.currentTileCtx = this.currentTileCanvas.getContext('2d');
+    this.nextTileCanvas = document.getElementById('next-tile-canvas');
+    this.nextTileCtx = this.nextTileCanvas.getContext('2d');
+
+    // Get references to the tile counter spans
+    this.totalTilesCountSpan = document.getElementById('total-tiles-count');
+    this.industryTilesCountSpan = document.getElementById('industry-tiles-count');
+    this.residenceTilesCountSpan = document.getElementById('residence-tiles-count');
+    this.roadTilesCountSpan = document.getElementById('road-tiles-count');
+
+    // Get references to the tile name divs
+    this.currentTileNameDiv = document.getElementById('current-tile-name');
+    this.nextTileNameDiv = document.getElementById('next-tile-name');
 
     // Subscribe to game events to keep the UI in sync.
     this.eventEmitter.on('SCORE_UPDATED', score => this.updateScore(score));
-    this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', tileId => this.updateNextTile(tileId));
-    this.eventEmitter.on('HEX_HOVERED', payload => this.updateTooltip(payload));
+    this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', () => {
+      this.updateTilePreviews();
+      this.updateTileCounter();
+    });
+    this.eventEmitter.on('GAME_OVER', () => {
+      // Use a minimal timeout to push this to the end of the event queue,
+      // ensuring the final map render has completed before showing the popup.
+      setTimeout(() => this.showGameOverPopup(), 100);
+    });
+    this.eventEmitter.on('TILES_AWARDED', message => this._showNotification(message));
+    // Also listen for a new game request to hide the popup if it's open.
+    this.eventEmitter.on('NEW_GAME_REQUESTED', () => {
+      this.hideGameOverPopup();
+      this._clearAllNotifications();
+    });
+
+    this.eventEmitter.on('HEX_HOVERED', payload => {
+      const { tile } = payload;
+      let placementInfo = null;
+
+      // Calculate placement info only if there's a tile, it's empty, and the player has a building.
+      if (tile && !tile.contentType && this.player?.currentTileInHand && this.map) {
+        const baseBuildingId = this.player.currentTileInHand;
+        placementInfo = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+      }
+
+      // Add placementInfo to the payload for the other functions to use.
+      const newPayload = { ...payload, placementInfo };
+
+      this.updateTooltip(newPayload);
+      this.drawPlacementPreview(newPayload);
+    });
   }
 
   /**
@@ -67,10 +131,12 @@ export default class UIManager {
    * @param {import('./Player.js').default} player The game's player instance.
    * @param {import('./Map.js').default} map The game's map instance.
    */
-  setContext(player, map) {
+    setContext(player, map, renderer) {
     this.player = player;
     this.map = map;
+    this.renderer = renderer;
   }
+
 
   /**
    * Creates the configuration sliders for map generation.
@@ -176,24 +242,16 @@ export default class UIManager {
     // Create a wrapper to group the text input and button for flexbox layout.
     // This allows us to control their relative widths precisely.
     const inputWrapper = document.createElement('div');
-    inputWrapper.style.display = 'flex';
-    inputWrapper.style.flexGrow = '1'; // Allows the wrapper to fill available space
+    inputWrapper.className = 'seed-input-wrapper';
 
     this.seedInput = document.createElement('input');
     this.seedInput.type = 'text';
     this.seedInput.id = 'seed-input';
     this.seedInput.placeholder = 'Leave blank for random';
-    this.seedInput.style.width = '75%'; // Occupy the majority of the space
-    this.seedInput.style.boxSizing = 'border-box';
 
     this.randomSeedButton = document.createElement('button');
     this.randomSeedButton.id = 'random-seed-button';
     this.randomSeedButton.textContent = 'Random';
-    this.randomSeedButton.style.width = '25%'; // The button's width is ~33% of the input's
-    this.randomSeedButton.style.fontSize = '0.8em'; // Reduce font size
-    this.randomSeedButton.style.padding = '0.2em';
-    this.randomSeedButton.style.boxSizing = 'border-box';
-    this.randomSeedButton.style.marginLeft = '4px';
 
     // Add event listener to the "Random" button to generate a new seed.
     this.randomSeedButton.addEventListener('click', () => {
@@ -240,7 +298,9 @@ export default class UIManager {
   _createScoreDisplay() {
     this.scoreDisplay = document.createElement('div');
     this.scoreDisplay.className = 'score-display';
-    this.scoreContainer.appendChild(this.scoreDisplay);
+    // Insert the score display before the tile counter display to ensure correct order.
+    const tileCounter = document.getElementById('tile-counter-display');
+    this.scoreContainer.insertBefore(this.scoreDisplay, tileCounter);
   }
 
   /**
@@ -252,25 +312,45 @@ export default class UIManager {
   }
 
   /**
-   * Creates the "Next Tile" display, which includes a text label and a canvas for the icon.
+   * Creates the "Game Over" modal popup and appends it to the body.
+   * It is initially hidden.
    * @private
    */
-  _createNextTileDisplay() {
-    const container = document.createElement('div');
-    container.className = 'next-tile-display';
+  _createGameOverPopup() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'none'; // Initially hidden
 
-    this.nextTileLabel = document.createElement('span');
-    this.nextTileLabel.textContent = 'Next Tile:';
+    const content = document.createElement('div');
+    content.className = 'modal-content';
 
-    const displayConfig = Config.UIConfig.nextTileDisplay;
-    this.nextTileCanvas = document.createElement('canvas');
-    this.nextTileCanvas.width = displayConfig.width;
-    this.nextTileCanvas.height = displayConfig.height;
-    this.nextTileCtx = this.nextTileCanvas.getContext('2d');
+    const title = document.createElement('h2');
+    title.textContent = 'Game Over';
 
-    container.appendChild(this.nextTileLabel);
-    container.appendChild(this.nextTileCanvas);
-    this.nextTileContainer.appendChild(container);
+    const scoreText = document.createElement('p');
+    scoreText.id = 'final-score-text'; // To easily update it
+
+    const newGameBtn = document.createElement('button');
+    newGameBtn.textContent = 'Play Again';
+    newGameBtn.addEventListener('click', () => {
+      this.hideGameOverPopup();
+      this.eventEmitter.emit('NEW_GAME_REQUESTED');
+    });
+
+    content.append(title, scoreText, newGameBtn);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    this.gameOverPopup = overlay;
+  }
+
+  /**
+   * Hides the game over popup.
+   */
+  hideGameOverPopup() {
+    if (this.gameOverPopup) {
+      this.gameOverPopup.style.display = 'none';
+    }
   }
 
   /**
@@ -283,10 +363,10 @@ export default class UIManager {
 
   /**
    * Updates the tooltip's content and position based on the hovered tile.
-   * @param {{tile: import('./HexTile.js').default|null, event: MouseEvent|null}} payload The event payload from the InputHandler.
+    * @param {{tile: import('./HexTile.js').default|null, event: MouseEvent|null, placementInfo: object|null}} payload The event payload.
    */
   updateTooltip(payload) {
-    const { tile, event } = payload;
+     const { tile, event, placementInfo } = payload;
 
     if (tile && event) {
       // Construct the tooltip text, including the feature name if one exists.
@@ -297,25 +377,48 @@ export default class UIManager {
 
       // Add information about the tile's content (building or resource).
       if (tile.contentType) {
-        // The contentType can be an instance of Building or a plain object from the ResourceLibrary.
         if (tile.contentType instanceof Building) {
           // For buildings, the 'type' property holds the name (e.g., 'Residence').
           tooltipText += ` | Building: ${tile.contentType.type}`;
+        } else if (tile.contentType instanceof Resource) {
+          // For resources, we need to look up the name in the ResourceLibrary
+          // using the resource's 'type' property.
+          const resourceDef = ResourceLibrary[tile.contentType.type.toUpperCase()];
+          if (resourceDef) {
+            tooltipText += ` | Resource: ${resourceDef.name}`;
+            if (tile.contentType.isClaimed) {
+              tooltipText += ' (Claimed)';
+            }
+          }
         } else {
-          // For resources, the 'name' property holds the name (e.g., 'Iron').
-          tooltipText += ` | Resource: ${tile.contentType.name}`;
+          console.warn('Unknown content type in tooltip:', tile.contentType);
         }
-      } else if (this.player?.currentTileInHand && this.map) {
+      } else if (placementInfo) {
         // If the tile is empty and the player is holding a building, show placement preview.
-        const baseBuildingId = this.player.currentTileInHand;
-        const result = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+        const result = placementInfo;
 
         if (result.isValid) {
           const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
           const scoreText = result.score.total > 0 ? `+${result.score.total}` : result.score.total.toString();
 
-          const color = result.score > 0 ? 'green' : (result.score < 0 ? 'red' : 'gray');
-          tooltipText += ` | Place: <span style="color:${color};">${buildingDef.name} (${scoreText})</span>`;
+          // Determine the building name to display. If a transformation has a `name`, use it; otherwise, use the base building name.
+          let buildingName = buildingDef.name; // Default to base building name
+          if (result.resolvedBuildingId !== this.player.currentTileInHand) {
+            // Check if this transformation has a specific name (Residence transformations).
+            const transformDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
+            if (transformDef?.name) {
+              buildingName = transformDef.name; // Use transformation name if available
+            }
+          }
+
+          // Style the display based on the score.
+          let color = 'gray';  // Default for neutral scores
+          if (result.score.total > 0) {
+            color = 'green';  // Positive scores
+          } else if (result.score.total < 0) {
+            color = 'red';    // Negative scores
+          }
+          tooltipText += ` | Place: <span style="color:${color};">${buildingName} (${scoreText})</span>`;
         } else {
           tooltipText += ` | <span style="color:red;">Cannot build here</span>`;
         }
@@ -343,27 +446,146 @@ export default class UIManager {
   }
 
   /**
-   * Updates the "Next Tile" icon by redrawing it.
-   * @param {string|null} tileId The ID of the tile in the player's hand.
+   * Displays the game over popup with the final score.
    */
-  updateNextTile(tileId) {
-    const ctx = this.nextTileCtx;
-    const canvas = this.nextTileCanvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  showGameOverPopup() {
+    if (!this.gameOverPopup || !this.player) return;
 
-    if (!tileId) return;
+    const scoreText = this.gameOverPopup.querySelector('#final-score-text');
+    scoreText.textContent = `Your final score is: ${this.player.score}`;
 
-    const hexSize = Config.UIConfig.nextTileDisplay.hexSize;
-    const cx = canvas.width / 2;  
-    const cy = canvas.height / 2;
+    this.gameOverPopup.style.display = 'flex';
+  }
 
-    // Draw a generic background tile for the icon.
-    this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Savannah color as a neutral background.
+  /**
+   * Removes all active toast notifications from the screen.
+   * This is called when a new game starts to prevent old notifications from persisting.
+   * @private
+   */
+  _clearAllNotifications() {
+    for (const notification of this.activeNotifications) {
+      notification.remove();
+    }
+    this.activeNotifications = [];
+  }
 
-    // Find the building's definition in the library and use the new utility to draw it.
-    const buildingDefinition = BuildingDefinitionMap.get(tileId);
-    if (buildingDefinition?.draw) {
-      DrawingUtils.drawDetails(ctx, buildingDefinition, cx, cy, hexSize);
+  /**
+   * Displays a temporary "toast" notification on the screen.
+   * The notification will require CSS for styling and animation.
+   * @param {string} message The message to display.
+   * @private
+   */
+  _showNotification(message) {
+    // Ensure the notification is appended relative to the game area, not the whole page.
+    const container = this.renderer?.canvas.parentElement;
+    if (!container) {
+      console.error("Cannot show notification: Game container not found.");
+      return;
+    }
+
+    const notification = document.createElement('div');
+    notification.className = 'toast-notification';
+    notification.textContent = message;
+
+    container.appendChild(notification);
+    this.activeNotifications.push(notification);
+
+    // A small delay ensures the element is in the DOM before the 'show' class is added,
+    // allowing the CSS transition to trigger correctly.
+    setTimeout(() => {
+      notification.classList.add('show');
+    }, 10);
+
+    // Set a timer to start the fade-out process.
+    setTimeout(() => {
+      notification.classList.remove('show');
+
+      // Set a second, reliable timer to remove the element from the DOM after
+      // the CSS fade-out transition has completed. This avoids relying on the
+      // sometimes-unreliable 'transitionend' event.
+      setTimeout(() => {
+        notification.remove();
+        const index = this.activeNotifications.indexOf(notification);
+        if (index > -1) this.activeNotifications.splice(index, 1);
+      }, Config.UIConfig.notificationTransitionDuration);
+    }, Config.UIConfig.notificationDuration);
+  }
+
+  /**
+   * Clears any temporary drawings from the overlay canvas.
+   */
+  clearPlacementPreview() {
+    const { canvas, ctx } = renderContext.overlay;
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  /**
+   * Draws a preview of a potential building placement on the overlay canvas.
+   * This includes score-based shading, resource claim outlines, and the building icon.
+    * @param {{tile: import('./HexTile.js').default|null, placementInfo: object|null}} payload The event payload.
+   */
+  drawPlacementPreview(payload) {
+    this.clearPlacementPreview();
+
+    const { tile, placementInfo } = payload;
+    // We only draw a preview if the placement is valid.
+    if (!tile || !placementInfo || !placementInfo.isValid) {
+      return;
+    }
+
+    // --- 1. Determine Shading Color ---
+    let shadeColor = null;
+    const score = placementInfo.score.total;
+
+    const shading = Config.UIConfig.previewShading;
+    if (score < 0) {
+      shadeColor = shading.negative;
+    } else if (score === 2) {
+      shadeColor = shading.positive_ok;
+    } else if (score > 2) {
+      shadeColor = shading.positive_good;
+    }
+
+    // --- 2. Draw the Shading (if applicable) ---
+    if (shadeColor) {
+      const { ctx } = renderContext.overlay;
+      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
+      const { x: tileX, y: tileY } = this.renderer.tileToPixel(tile);
+      const hexSize = this.renderer.hexSize;
+
+      ctx.fillStyle = shadeColor;
+      DrawingUtils.drawHexPath(ctx, tileX + offsetX, tileY + offsetY, hexSize);
+      ctx.fill();
+    }
+
+    // --- 3. Draw Building Icon ---
+    // We draw the icon of the building that *would* be placed, including transformations.
+    const buildingDef = BuildingDefinitionMap.get(placementInfo.resolvedBuildingId);
+    if (buildingDef?.draw) {
+      const { ctx } = renderContext.overlay;
+      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
+      const { x: tileX, y: tileY } = this.renderer.tileToPixel(tile);
+      const hexSize = this.renderer.hexSize;
+
+      // DrawingUtils.drawDetails handles its own translation, so we pass the final screen coordinates.
+      DrawingUtils.drawDetails(ctx, buildingDef, tileX + offsetX, tileY + offsetY, hexSize);
+    }
+
+    // --- 4. Draw Resource Claim Outline ---
+    if (placementInfo.claimedResourceTile) {
+      const { ctx } = renderContext.overlay;
+      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
+
+      ctx.save();
+      ctx.translate(offsetX, offsetY); // Apply the same offset as the main renderer.
+
+      const tilesToOutline = [tile, placementInfo.claimedResourceTile];
+      // Call the refactored method, passing the overlay context.
+      this.renderer.tileOutline(tilesToOutline, Config.tileOutlineStyle, ctx);
+
+      ctx.restore(); // Remove the translation.
     }
   }
 
@@ -396,5 +618,87 @@ export default class UIManager {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  }
+
+  /**
+   * Draws a preview of a single tile onto a given canvas.
+   * @param {CanvasRenderingContext2D} ctx The rendering context.
+   * @param {HTMLCanvasElement} canvas The canvas to draw on.
+   * @param {string} tileId The ID of the building to draw.
+   * @private
+   */
+  _drawTilePreview(ctx, canvas, tileId) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const hexSize = Math.min(canvas.width, canvas.height) / 2 * 0.85;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // Draw a generic background tile for the icon.
+    this._drawHexagon(ctx, cx, cy, hexSize, '#f0e68c'); // Steppe color as a neutral background.
+
+    // Find the building's definition in the library and use the new utility to draw it.
+    const buildingDefinition = BuildingDefinitionMap.get(tileId);
+    if (buildingDefinition?.draw) {
+      DrawingUtils.drawDetails(ctx, buildingDefinition, cx, cy, hexSize);
+    }
+  }
+
+  /**
+   * Updates both the "Current Tile" and "Next Tile" previews.
+   * This function reads directly from the player's state.
+   */
+  updateTilePreviews() {
+    if (!this.player) return;
+
+    const currentTileId = this.player.currentTileInHand;
+    // The "next" tile is the one at the top of the deck (which is the end of the array because of pop())
+    const nextTileId = this.player.deck.length > 0 ? this.player.deck[this.player.deck.length - 1] : null;
+
+    // Draw the current tile being placed
+    if (currentTileId) {
+      this._drawTilePreview(this.currentTileCtx, this.currentTileCanvas, currentTileId);
+      const buildingDef = BuildingDefinitionMap.get(currentTileId);
+      this.currentTileNameDiv.textContent = buildingDef?.name || '';
+    } else {
+      // If there's no current tile, the game is likely over.
+      drawEndIndicator(this.currentTileCanvas);
+      this.currentTileNameDiv.textContent = '';
+    }
+
+    // Draw the upcoming tile
+    if (nextTileId) {
+      this._drawTilePreview(this.nextTileCtx, this.nextTileCanvas, nextTileId);
+      const buildingDef = BuildingDefinitionMap.get(nextTileId);
+      this.nextTileNameDiv.textContent = buildingDef?.name || '';
+    } else {
+      // If there's no next tile, the deck is empty.
+      drawEndIndicator(this.nextTileCanvas);
+      this.nextTileNameDiv.textContent = '';
+    }
+  }
+
+  /**
+   * Updates the tile counter display with the total and breakdown of tiles remaining in the deck.
+   */
+  updateTileCounter() {
+    if (!this.player) return;
+
+    const deck = this.player.deck;
+    const totalCount = deck.length;
+
+    // Use reduce to get the breakdown in a single pass, initializing with the keys we care about.
+    const breakdown = deck.reduce((acc, tileId) => {
+      if (acc.hasOwnProperty(tileId)) {
+        acc[tileId]++;
+      }
+      return acc;
+    }, { 'Industry': 0, 'Residence': 0, 'Road': 0 });
+
+    // Update the DOM elements
+    this.totalTilesCountSpan.textContent = totalCount;
+    this.industryTilesCountSpan.textContent = breakdown['Industry'];
+    this.residenceTilesCountSpan.textContent = breakdown['Residence'];
+    this.roadTilesCountSpan.textContent = breakdown['Road'];
   }
 }

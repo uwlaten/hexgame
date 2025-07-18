@@ -3,6 +3,8 @@
  * hexagonal tile on the game map.
  */
 import { Building } from './Building.js';
+import { Resource } from './Resource.js';
+import { ResourceLibrary } from './ResourceLibrary.js';
 
 /**
  * Represents a single tile in the game world.
@@ -68,7 +70,7 @@ export default class HexTile {
   setContent(content) {
     const isResourceDefinition = content && typeof content === 'object' && content.id;
 
-    if (content === null || content instanceof Building || isResourceDefinition) {
+    if (content === null || content instanceof Building || content instanceof Resource) {
       this.contentType = content;
     } else {
       console.error('Invalid content type. Must be a Building, a valid Resource from ResourceLibrary, or null.', content);
@@ -89,6 +91,10 @@ export default class HexTile {
    */
   clone() {
     // The constructor handles all properties correctly, including setting the content.
-    return new HexTile(this.x, this.y, this.biome, this.feature, this.contentType, this.map);
+    const clonedTile = new HexTile(this.x, this.y, this.biome, this.feature, null, this.map);
+    if (this.contentType instanceof Building || this.contentType instanceof Resource) {
+      clonedTile.setContent(this.contentType.clone());
+    }
+    return clonedTile;
   }
 }

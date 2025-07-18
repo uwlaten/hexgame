@@ -6,7 +6,9 @@ import DrawingUtils from './DrawingUtils.js';
 import Config from './Config.js';
 import HexTile from './HexTile.js';
 import { Building } from './Building.js';
-import { BuildingLibrary } from './BuildingLibrary.js';
+import { BuildingDefinitionMap } from './BuildingLibrary.js';
+import { Resource } from './Resource.js';
+import { ResourceLibrary } from './ResourceLibrary.js';
 
 /**
  * Handles all drawing operations on the HTML canvas.
@@ -16,13 +18,21 @@ export default class Renderer {
    * Creates an instance of the Renderer.
    * @param {HTMLCanvasElement} canvas The canvas element to draw on.
    * @param {number} hexSize The size (radius) of a single hexagon tile from its center to a corner.
+   * @param {import('./EventEmitter.js').default} eventEmitter The central event bus.
+   * @param {import('./Map.js').default} map The game map.
    */
-  constructor(canvas, hexSize) {
+  constructor(canvas, hexSize, eventEmitter, map) {
     /**
      * The HTML canvas element.
      * @type {HTMLCanvasElement}
      */
     this.canvas = canvas;
+    /**
+     * @type {import('./EventEmitter.js').default}
+     */
+    this.eventEmitter = eventEmitter;
+    /** @type {import('./Map.js').default} */
+    this.map = map;
 
     /**
      * The 2D rendering context for the canvas.
@@ -42,6 +52,38 @@ export default class Renderer {
      * @private
      */
     this._padding = Config.RendererConfig.padding;
+
+    /**
+     * Stores groups of tiles that need a persistent outline. Each group is an array of HexTile objects.
+     * @type {HexTile[][]}
+     */
+    this.outlinedTileGroups = [];
+  }
+
+  /**
+   * Initializes the renderer by setting up event listeners.
+   */
+  init() {
+    // Subscribe to the MAP_STATE_CHANGED event. This will become the primary
+    // trigger for redrawing the entire map when the game's logical state changes.
+    this.eventEmitter.on('MAP_STATE_CHANGED', () => {
+      this.drawMap(this.map);
+    });
+  }
+
+  /**
+   * Adds a group of tiles to be outlined on subsequent draws.
+   * @param {HexTile[]} tiles An array of tiles that form a single outlined group.
+   */
+  addOutlinedGroup(tiles) {
+    this.outlinedTileGroups.push(tiles);
+  }
+
+  /**
+   * Clears all persistent outlines. Called when starting a new game.
+   */
+  clearOutlines() {
+    this.outlinedTileGroups = [];
   }
 
   /**
@@ -53,6 +95,17 @@ export default class Renderer {
     const cx = this.hexSize * Math.sqrt(3) * (tile.x + 0.5 * (tile.y & 1));
     const cy = this.hexSize * (3 / 2) * tile.y;
     return { x: cx, y: cy };
+  }
+
+  /**
+   * Gets the translation offset used when drawing the map.
+   * This is needed to align drawings on an overlay canvas.
+   * @returns {{x: number, y: number}} The x and y translation offset.
+   */
+  getTranslationOffset() {
+    const x = (this.hexSize * Math.sqrt(3)) / 2 + this._padding;
+    const y = this.hexSize + this._padding;
+    return { x, y };
   }
 
   /**
@@ -100,22 +153,100 @@ export default class Renderer {
     }
 
     // If the tile has content (like a building or resource), draw it.
-    if (tile.contentType) {
-      let definitionToDraw = null;
-      if (tile.contentType instanceof Building) {
-        // For Buildings, we look up the definition in the library.
-        definitionToDraw = Object.values(BuildingLibrary).find(b => b.id === tile.contentType.type);
-      } else {
-        // For Resources, the contentType *is* the definition.
-        definitionToDraw = tile.contentType;
+    if (tile.contentType instanceof Building) {
+      // For Buildings, we look up the definition in the library by type.
+      const buildingDef = BuildingDefinitionMap.get(tile.contentType.type);
+            
+      if (buildingDef?.draw) {
+        DrawingUtils.drawDetails(this.ctx, buildingDef, cx, cy, this.hexSize);
       }
+    } else if (tile.contentType instanceof Resource) {
+      // For Resources, we also need to look up the visual definition in the library,
+      // but we use the resource's `type` property as the key.
+      const resourceDef = ResourceLibrary[tile.contentType.type.toUpperCase()];
+      if (resourceDef?.draw) {
+        DrawingUtils.drawDetails(this.ctx, resourceDef, cx, cy, this.hexSize);
 
-      // Use the drawing utility to render the icon for the building or resource.
-      if (definitionToDraw?.draw) {
-        DrawingUtils.drawDetails(this.ctx, definitionToDraw, cx, cy, this.hexSize);
+        // --- NEW: Draw a "claimed" indicator if the resource has been claimed. ---
+        if (tile.contentType.isClaimed) {
+          this.ctx.fillStyle = 'rgba(128, 128, 128, 0.5)'; // Semi-transparent grey
+          this.ctx.beginPath();
+          this.ctx.arc(cx, cy, this.hexSize * 0.4, 0, 2 * Math.PI); // Slightly smaller circle
+          this.ctx.fill();
+          // Alternatively, draw an 'X':
+          // DrawingUtils.drawX(this.ctx, cx, cy, this.hexSize * 0.5, 'rgba(0,0,0,0.8)', 2);
+        }
       }
     }
   }
+
+  /**
+   * Draws an outline around a set of tiles, excluding shared edges.
+   * @param {HexTile[]} tiles An array of HexTile objects to outline.
+   * @param {Object} style The style object for the outline (strokeStyle, lineWidth).
+   * @param {CanvasRenderingContext2D} [ctx=this.ctx] The rendering context to draw on. Defaults to the main canvas context.
+   */
+  tileOutline(tiles, style, ctx = this.ctx) {
+    if (!tiles || tiles.length === 0) return;
+
+    const edgeIds = new Set();
+
+    // 1. Collect all edge IDs for the given tiles.
+    for (const tile of tiles) {
+      const vertexIds = HexGridUtils.getVerticesForTile(tile, this.map);
+      for (let i = 0; i < vertexIds.length; i++) {
+        const vertexId1 = vertexIds[i];
+        const vertexId2 = vertexIds[(i + 1) % vertexIds.length];
+        const edgeId = HexGridUtils.getEdgeId(vertexId1, vertexId2);
+        edgeIds.add(edgeId);
+      }
+    }
+
+    // 2. Identify and remove shared edges (duplicates).
+    const uniqueEdgeIds = new Set(edgeIds);
+    const edgesToDraw = [];
+
+    for (const edgeId of uniqueEdgeIds) {
+      let count = 0;
+      for (const tile of tiles) {
+        const vertexIds = HexGridUtils.getVerticesForTile(tile, this.map);
+        for (let i = 0; i < vertexIds.length; i++) {
+          const vertexId1 = vertexIds[i];
+          const vertexId2 = vertexIds[(i + 1) % vertexIds.length];
+          const currentEdgeId = HexGridUtils.getEdgeId(vertexId1, vertexId2);
+          if (currentEdgeId === edgeId) {
+            count++;
+          }
+        }
+      }
+      if (count === 1) {
+        edgesToDraw.push(edgeId); // Only draw if the edge appears once (not shared)
+      }
+    }
+
+    // 3. Draw the non-shared edges.
+    ctx.save(); // Save the current context state
+    ctx.strokeStyle = style.strokeStyle;
+    ctx.lineWidth = style.lineWidth;
+    ctx.setLineDash(Config.tileOutlineDash);
+
+
+    for (const edgeId of edgesToDraw) {      
+      const [vertexId1, vertexId2] = HexGridUtils.getVerticesForEdge(edgeId);
+      const p1 = this._getVertexPixelCoords(vertexId1, this.map);
+      const p2 = this._getVertexPixelCoords(vertexId2, this.map);
+      
+      if (p1 && p2) {
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();    
+  }
+
+  
 
   /**
    * Calculates the required canvas dimensions to fit the entire map, including padding.
@@ -327,6 +458,13 @@ export default class Renderer {
 
     // Draw rivers on top of tiles and outlines.
     this._drawRivers(map);
+
+    // Draw persistent outlines for claimed resources, etc.
+    if (this.outlinedTileGroups.length > 0) {
+      for (const group of this.outlinedTileGroups) {
+        this.tileOutline(group, Config.tileOutlineStyle);
+      }
+    }
 
     // Restore the context to its original state
     this.ctx.restore();

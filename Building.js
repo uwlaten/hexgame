@@ -12,6 +12,22 @@ export class Building {
    */
   constructor(type) {
     this.type = type;
-    // In the future, this could hold instance-specific data like health or level.
+    /**
+     * A reference to the HexTile containing the resource this building has claimed.
+     * This is only used by resource-claiming Industry buildings.
+     * @type {import('./HexTile.js').default|null}
+     */
+    this.claimedResourceTile = null;
+  }
+
+  /**
+   * Creates a new Building instance with the same type and properties.
+   */
+  clone() {
+    const newBuilding = new Building(this.type);
+    // When cloning, we need to carry over the claimed resource link if it exists.
+    // This is important for hypothetical checks that might need to know about existing claims.
+    newBuilding.claimedResourceTile = this.claimedResourceTile;
+    return newBuilding;
   }
 }

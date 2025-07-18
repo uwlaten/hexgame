@@ -15,11 +15,37 @@
           <!-- UI controls will be added here by UIManager.js -->
         </div>
       </div>
-      <div id="score-container" class="header-center"></div>
-      <div id="next-tile-container" class="header-right"></div>
+      <div id="score-container" class="header-center">
+        <!-- Score is populated here by UIManager.js -->
+        <div id="tile-counter-display">
+          <div class="total-tiles">
+            <strong>Tiles Left: </strong><span id="total-tiles-count">0</span>
+          </div>
+          <div class="tile-breakdown">
+            <div>Industry: <span id="industry-tiles-count">0</span></div> 
+            <div>Residential: <span id="residence-tiles-count">0</span></div> 
+            <div>Road: <span id="road-tiles-count">0</span></div>
+          </div>
+        </div>
+      </div>
+      <div id="next-tile-container" class="header-right">
+        <div class="tile-preview">
+          <h4>Current Tile</h4>
+          <canvas id="current-tile-canvas" width="100" height="86"></canvas>
+          <div id="current-tile-name" class="tile-name"></div>
+        </div>
+        <div class="tile-preview">
+          <h4>Next Tile:</h4>
+          <canvas id="next-tile-canvas" width="100" height="86"></canvas>
+          <div id="next-tile-name" class="tile-name"></div>
+        </div>
+      </div>
     </header>
     <main class="game-container">
-      <canvas id="gameCanvas"></canvas>
+      <div class="canvas-wrapper">
+        <canvas id="gameCanvas"></canvas>
+        <canvas id="game-overlay"></canvas>
+      </div>
       <div id="tooltip-container" class="tooltip"></div>
     </main>
   </div>

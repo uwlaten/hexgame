@@ -23,7 +23,7 @@ export default class Player {
     this.cityCentrePlaced = false;
     this.hand = Config.PlayerConfig.initialHand[0]; // Start with the City Centre.
 
-    this.deck = []; // The main deck is initially empty.
+    this.deck = this._generateDeck(); // The main deck is now generated and shuffled immediately.
     this.deckSize = Config.PlayerConfig.initialDeckSize;
 
     // The type of tile the player currently has selected to place on the map.
@@ -31,7 +31,7 @@ export default class Player {
 
     // Announce the initial score so the UI can display it.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
   
   _generateDeck() {
@@ -60,12 +60,31 @@ export default class Player {
     this.score = 0;
     this.cityCentrePlaced = false;
     this.hand = Config.PlayerConfig.initialHand[0];
-    this.deck = [];
+    this.deck = this._generateDeck(); // Also regenerate the deck on reset.
     this.currentTileInHand = this.hand;
 
     // Announce the reset state to the UI.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
+  }
+
+  /**
+   * Adds an array of new tiles to the player's deck and shuffles it.
+   * @param {string[]} tilesToAdd An array of building IDs to add to the deck.
+   */
+  addTilesToDeck(tilesToAdd) {
+    if (!tilesToAdd || tilesToAdd.length === 0) return;
+
+    // Add each new tile to the deck.
+    for (const tileId of tilesToAdd) {
+      this.deck.push(tileId);
+    }
+
+    // Shuffle the deck to integrate the new tiles.
+    this._shuffleArray(this.deck);
+
+    // Announce that the deck has changed so the UI can update.
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
 
   /**
@@ -81,9 +100,10 @@ export default class Player {
       this.currentTileInHand = this.deck.pop(); // Draw from the end (more efficient).
     } else {
       // Main deck is empty.
-      console.warn('Player deck is empty. Cannot draw a new tile.');
       this.currentTileInHand = null;
+      // Announce that the game is over because the player has no more tiles.
+      this.eventEmitter.emit('GAME_OVER');
     }
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED', this.currentTileInHand);
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
 }

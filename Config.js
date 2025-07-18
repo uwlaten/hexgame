@@ -165,8 +165,8 @@ export default {
     // The building IDs that the player starts with in their deck.
     initialHand: ['CityCentre'],
     mainDeck: {
-      Industry: 10,
-      Residence: 10,
+      Industry: 11,
+      Residence: 11,
       Road: 2,
     },
     initialDeckSize: 15,
@@ -188,8 +188,74 @@ export default {
       width: 60,
       height: 60,
       hexSize: 25,
+    },
+    previewShading: {
+      // Color for a placement with a negative score.
+      negative: 'rgba(255, 0, 0, 0.5)',
+      // Color for a placement with a score of exactly 2.
+      positive_ok: 'rgba(144, 238, 144, 0.5)',
+      // Color for a placement with a score greater than 2.
+      positive_good: 'rgba(0, 100, 0, 0.5)',
+    },
+    // Duration in milliseconds for toast notifications to stay on screen.
+    notificationDuration: 5000,
+    // Duration in milliseconds for the notification fade-in/out transition. Must match CSS.
+    notificationTransitionDuration: 500,
+  },
+
+  /**
+   * Holds all tunable parameters for resource claim rewards.
+   */
+  RewardConfig: {
+    /**
+     * A master switch to enable or disable unique tile rewards (e.g., Forge, Bakery)
+     * from claiming resources. Set to false to only receive bundle rewards.
+     */
+    enableUniqueTileRewards: false,
+
+    // This is the master list of all reward bundles.
+    bundles: {
+      // The default bundle, used if a resource doesn't specify one.
+      default: {
+        message: "+5 Tiles", // Message part for this bundle
+        count: 5,            // Number of random tiles to award
+        pool: [              // Weighted pool for random selection
+          { id: 'Industry', weight: 5 },
+          { id: 'Residence', weight: 5 },
+          { id: 'Road', weight: 1 }
+        ]
+      },
+      // A specific bundle for industrial resources.
+      IndustryBundle: {
+        message: "+5 Tiles",
+        count: 5,
+        pool: [
+          { id: 'Industry', weight: 10 },
+          { id: 'Residence', weight: 5 },
+          { id: 'Road', weight: 1 }
+        ]
+      },
+      // A specific bundle for residential/food resources.
+      ResidentialBundle: {
+        message: "+5 Tiles",
+        count: 5,
+        pool: [
+          { id: 'Industry', weight: 5 },
+          { id: 'Residence', weight: 10 },
+          { id: 'Road', weight: 1 }
+        ]
+      }
     }
   },
 
+  /**
+   * Defines the style for tile outlines.
+   */
+  tileOutlineStyle: {
+    strokeStyle: 'rgba(255, 0, 0, 0.8)', // Red outline
+    lineWidth: 2.5,
+  },
+  
+  tileOutlineDash: [5, 5], // Parameters for dashed format. First number: length of dash; second number: length of gap.
 
 };

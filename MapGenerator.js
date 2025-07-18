@@ -10,6 +10,7 @@ import { BiomeLibrary } from './BiomeLibrary.js';
 import { FeatureLibrary } from './FeatureLibrary.js';
 import { ResourceLibrary } from './ResourceLibrary.js';
 import { Building } from './Building.js';
+import { Resource } from './Resource.js';
 import { createNoise2D } from 'https://cdn.skypack.dev/simplex-noise';
 
 /**
@@ -1707,13 +1708,10 @@ export default class MapGenerator {
 
         for (const tile of candidates) {
           // Final validation: ensure the tile is still empty and not adjacent to another resource.
-          if (!tile.contentType && !this._isAdjacentToResource(tile, map)) {
-            const resourceDef = ResourceLibrary[resourceId.toUpperCase()];
-            if (resourceDef) {              
-                // Place a *copy* of the resource, not the original definition.
-                // This uses the spread syntax to create a shallow copy. If the resource
-                // definitions had nested objects, a deep copy would be necessary.
-              tile.setContent(resourceDef);
+          if (!tile.contentType && !this._isAdjacentToResource(tile, map)) {            
+            if (resourceId) {
+              // Place a new instance of the Resource class.
+              tile.setContent(new Resource(resourceId));
               return true; // Successfully placed.
             }
           }

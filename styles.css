@@ -22,14 +22,20 @@ body {
   box-shadow: 0 2px 5px rgba(0,0,0,0.3);
   margin-bottom: 2rem;
 }
-.header-left, .header-center, .header-right {
+
+.header-left, .header-right {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 30px; /* Add space between elements in the header sections */
 }
 .header-center {
+  flex: 1;
+  display: flex;
   justify-content: center;
+  /* Stack the score and tile counter vertically */
+  flex-direction: column;
+  align-items: center; /* Center items horizontally in the column */
 }
 .header-right {
   justify-content: flex-end;
@@ -39,19 +45,19 @@ body {
   flex-direction: column;
   gap: 5px; /* Tighter spacing for controls */
 }
-.config-panel button {
+.config-panel > button {
   padding: 8px 16px;
   font-size: 1rem;
   cursor: pointer;
   margin-top: 5px; /* Add some space above the button */
 }
-.slider-control {
+.slider-control, .input-control {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
 }
-.slider-control label {
+.slider-control label, .input-control label {
   width: 45px; /* Give labels a fixed width for alignment */
 }
 .slider-control output {
@@ -62,14 +68,52 @@ body {
 .slider-control input[type="range"] {
   width: 100px;
 }
+.seed-input-wrapper {
+  display: flex;
+  /* Match the combined width of the slider (100px) and output (75px) plus their gap (8px) */
+  width: 183px;
+  gap: 4px;
+}
+.seed-input-wrapper input[type="text"] {
+  flex-grow: 1; /* Let the input field take up most of the space */
+  width: 0; /* A common trick to make flex-grow work as expected */
+  box-sizing: border-box;
+  padding: 2px 4px;
+}
+.seed-input-wrapper button {
+  flex-shrink: 0; /* Prevent the button from shrinking */
+  font-size: 0.8em;
+  padding: 0.2em 0.5em;
+  box-sizing: border-box;
+}
 .score-display {
   font-size: 1.5rem;
   font-weight: bold;
+  /* Add some space below the score */
+  margin-bottom: 5px;
+}
+#tile-counter-display {
+  font-size: 0.8rem;
+  color: #ccc;
+}
+.tile-breakdown {
+  margin-top: 4px;
 }
 .next-tile-display {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.tile-preview {
+  /* Center the h4 heading over the canvas */
+  text-align: center;
+}
+.tile-name {
+  font-size: 0.8rem;
+  color: #ccc;
+  margin-top: 4px;
+  /* Give a fixed height to prevent layout shifts when text appears/disappears */
+  height: 1.2em;
 }
 .game-container {
   background-color: #222;
@@ -77,6 +121,50 @@ body {
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   text-align: center;
+}
+.canvas-wrapper {
+  /* This wrapper ensures the overlay canvas is positioned correctly relative to the game canvas */
+  position: relative;
+  /* The wrapper should size itself to the canvas within it */
+  display: inline-block;
+}
+#game-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Allows mouse events to pass through to the canvas below */
+  pointer-events: none;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal-content {
+  background-color: #333;
+  padding: 20px 40px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+.modal-content h2 {
+  margin-top: 0;
+}
+.modal-content p {
+  font-size: 1.2rem;
+  margin: 1rem 0;
+}
+.modal-content button {
+  padding: 10px 20px;
+  font-size: 1rem;
+  cursor: pointer;
 }
 h1 {
   margin: 0;

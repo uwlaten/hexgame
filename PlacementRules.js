@@ -6,6 +6,7 @@
 
 import HexGridUtils from './HexGridUtils.js';
 import { Building } from './Building.js';
+import { BuildingDefinitionMap } from './BuildingLibrary.js';
 
 /**
  * A static class that provides methods to validate game actions,
@@ -25,8 +26,17 @@ export default class PlacementRules {
     // Rule 1: The tile must be empty (no existing building *or* resource).
     if (tile.contentType) return false;
 
-    // Rule 2: The tile's biome must be designated as buildable.
-    if (!tile.biome.isBuildable) return false;
+    // Rule 2: The tile's biome must be buildable, unless there's an exception.
+    if (!tile.biome.isBuildable) {
+      const buildingDef = BuildingDefinitionMap.get(buildingType);
+      const exceptions = buildingDef?.buildableBiomeExceptions;
+
+      // Check if this building has exceptions and if the current biome is one of them.
+      if (!exceptions || !exceptions.includes(tile.biome.id)) {
+        return false; // No exception applies, so the placement is invalid.
+      }
+      // If we're here, an exception was found, so we don't return false and let the checks continue.
+    }
 
     // Rule 3: Cannot build on Oasis features.
     if (tile.feature?.id === 'oasis') return false;
