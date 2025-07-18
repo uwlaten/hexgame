@@ -5,6 +5,30 @@
 
 export default class DrawingUtils {
   /**
+   * Creates the path for a pointy-top hexagon. Does not fill or stroke.
+   * @param {CanvasRenderingContext2D} ctx The rendering context.
+   * @param {number} cx The center x-coordinate.
+   * @param {number} cy The center y-coordinate.
+   * @param {number} size The radius of the hexagon.
+   */
+  static drawHexPath(ctx, cx, cy, size) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      // Angle for pointy-top hex. -90 degrees or -PI/2 radians to start at the top.
+      const angle_deg = 60 * i - 90;
+      const angle_rad = (Math.PI / 180) * angle_deg;
+      const vx = cx + size * Math.cos(angle_rad);
+      const vy = cy + size * Math.sin(angle_rad);
+      if (i === 0) {
+        ctx.moveTo(vx, vy);
+      } else {
+        ctx.lineTo(vx, vy);
+      }
+    }
+    ctx.closePath();
+  }
+
+  /**
    * Draws detailed graphics for a drawable object (like a biome, feature, or building).
    * This method interprets the 'draw' property of a drawable object.
    * @param {CanvasRenderingContext2D} ctx The rendering context to draw on.

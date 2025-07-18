@@ -23,7 +23,7 @@ export default class PlacementResolver {
    * @param {import('./HexTile.js').default} targetTile The tile where placement is attempted.
    * @param {import('./Map.js').default} map The game map.
    * @param {import('./Player.js').default} player The player making the placement.
-   * @returns {{isValid: boolean, resolvedBuildingId: string|null, score: object, appliedTransformations: object[]}} An object describing the outcome.
+   * @returns {{isValid: boolean, resolvedBuildingId: string|null, score: object, appliedTransformations: object[], claimedResourceTile: import('./HexTile.js').default|null}} An object describing the outcome.
    */
   static resolvePlacement(baseBuildingId, targetTile, map, player) {
     
@@ -33,7 +33,7 @@ export default class PlacementResolver {
     // Delegate the initial hard-blocking checks to PlacementRules.
     const canPlace = PlacementRules.canPlaceBuilding(targetTile, baseBuildingId, player, map);
 
-    if (!canPlace) return { isValid: false, resolvedBuildingId: null, score: { total: 0, breakdown: [] }, appliedTransformations: [] };
+    if (!canPlace) return { isValid: false, resolvedBuildingId: null, score: { total: 0, breakdown: [] }, appliedTransformations: [], claimedResourceTile: null };
 
     // Phase 3: Find and Score All Possible Transformations
     const baseBuildingDef = BuildingDefinitionMap.get(baseBuildingId);
@@ -47,7 +47,7 @@ export default class PlacementResolver {
     // Re-check if placing this building would invalidate a future placement on an adjacent tile.
     // Now that we know the final outcome, we can check using the resolved building ID.
     if (this._preservesAdjacentValue(finalOutcome.id, targetTile, map, player, finalOutcome.id)) {
-      return { isValid: false, resolvedBuildingId: null, score: { total: 0, breakdown: [] }, appliedTransformations: [] };
+      return { isValid: false, resolvedBuildingId: null, score: { total: 0, breakdown: [] }, appliedTransformations: [], claimedResourceTile: null };
     }
 
     // Phase 4: Determine the Final Outcome based on game rules
@@ -58,6 +58,7 @@ export default class PlacementResolver {
       resolvedBuildingId: finalOutcome.id,
       score: finalOutcome.score,
       appliedTransformations: finalOutcome.appliedTransformations,
+      claimedResourceTile: finalOutcome.claimedResourceTile,
     };
   }
 
@@ -103,7 +104,7 @@ export default class PlacementResolver {
   /**
    * Finds all valid transformations for a building on a tile and calculates their scores.
    * @param {object} context - Optional context for hypothetical checks.
-   * @returns {Array<{transform: object, score: object}>} An array of valid outcomes, each with the transformation definition and its score report.
+   * @returns {Array<{transform: object, score: object, claimedResourceTile: import('./HexTile.js').default|null}>} An array of valid outcomes, each with the transformation definition and its score report.
    * @private
    */
   static _getPossibleOutcomes(baseBuildingDef, targetTile, map, context = {}) {
@@ -117,6 +118,7 @@ export default class PlacementResolver {
         const clonedTile = targetTile.clone();
         const tempBuilding = new Building(transform.id);
         clonedTile.setContent(tempBuilding);
+        let claimedResourceTile = null;
 
         // --- Simulate resource claim for scoring ---
         // This is crucial for the ClaimedResourceScoreRule to work during hypothetical checks.
@@ -130,6 +132,7 @@ export default class PlacementResolver {
                 neighborTile.contentType.type === resourceToClaim &&
                 !neighborTile.contentType.isClaimed) {
               tempBuilding.claimedResourceTile = neighborTile; // Set the link on the temporary building.
+              claimedResourceTile = neighborTile;
               break; // A building only claims one resource.
             }
           }
@@ -137,7 +140,7 @@ export default class PlacementResolver {
 
         // Calculate score on the cloned, modified tile. The original tile is untouched.
         const score = ScoringEngine.calculateScoreFor(transform.id, clonedTile, map);
-        outcomes.push({ transform, score });
+        outcomes.push({ transform, score, claimedResourceTile });
       }
     }
     return outcomes;
@@ -145,7 +148,7 @@ export default class PlacementResolver {
 
   /**
    * Determines the final building and score from a list of possible outcomes.
-   * @returns {{id: string, score: object, appliedTransformations: object[]}} The final outcome.
+   * @returns {{id: string, score: object, appliedTransformations: object[], claimedResourceTile: import('./HexTile.js').default|null}} The final outcome.
    * @private
    */
   static _determineFinalOutcome(outcomes, baseBuildingDef, targetTile, map) {
@@ -156,6 +159,7 @@ export default class PlacementResolver {
         id: negativeOutcome.transform.id,
         score: negativeOutcome.score,
         appliedTransformations: [negativeOutcome.transform],
+        claimedResourceTile: negativeOutcome.claimedResourceTile,
       };
     }
 
@@ -167,7 +171,7 @@ export default class PlacementResolver {
       const tempBuilding = new Building(baseBuildingDef.id);
       clonedTile.setContent(tempBuilding);
       const score = ScoringEngine.calculateScoreFor(baseBuildingDef.id, clonedTile, map);
-      return { id: baseBuildingDef.id, score, appliedTransformations: [] };
+      return { id: baseBuildingDef.id, score, appliedTransformations: [], claimedResourceTile: null };
     }
 
     // Handle 'additive' model (e.g., Residence)
@@ -187,6 +191,7 @@ export default class PlacementResolver {
           id: resolvedId,
           score,
           appliedTransformations: transformations,
+          claimedResourceTile: null, // Luxury homes don't claim resources.
         };
       }
     }
@@ -200,6 +205,7 @@ export default class PlacementResolver {
       id: bestOutcome.transform.id,
       score: bestOutcome.score,
       appliedTransformations: [bestOutcome.transform],
+      claimedResourceTile: bestOutcome.claimedResourceTile,
     };
   }
 

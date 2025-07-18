@@ -188,7 +188,15 @@ export default {
       width: 60,
       height: 60,
       hexSize: 25,
-    }
+    },
+    previewShading: {
+      // Color for a placement with a negative score.
+      negative: 'rgba(255, 0, 0, 0.5)',
+      // Color for a placement with a score of exactly 2.
+      positive_ok: 'rgba(144, 238, 144, 0.5)',
+      // Color for a placement with a score greater than 2.
+      positive_good: 'rgba(0, 100, 0, 0.5)',
+    },
   },
 
   /**

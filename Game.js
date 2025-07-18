@@ -37,7 +37,7 @@ export default class Game {
     this.eventEmitter.on('NEW_GAME_REQUESTED', this.reset.bind(this));
 
     // Provide the UIManager with access to the game state for previews.
-    this.uiManager.setContext(this.player, this.map);
+    this.uiManager.setContext(this.player, this.map, this.renderer);
     // Manually trigger the first preview update now that the context is set.
     this.uiManager.updateTilePreviews();
     this.uiManager.updateTileCounter();
@@ -116,6 +116,9 @@ export default class Game {
       // event to indicate this isn't a real mouse movement.
       this.eventEmitter.emit('HEX_HOVERED', { tile, event: null });
     }
+
+    // After any potential state change, notify the renderer.
+    this.eventEmitter.emit('MAP_STATE_CHANGED');
   }
 
 

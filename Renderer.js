@@ -69,10 +69,6 @@ export default class Renderer {
     this.eventEmitter.on('MAP_STATE_CHANGED', () => {
       this.drawMap(this.map);
     });
-    // Also subscribe to HEX_HOVERED to allow dynamic updates
-    this.eventEmitter.on('HEX_HOVERED', () => {
-      this.drawMap(this.map);
-    });
   }
 
   /**
@@ -99,6 +95,17 @@ export default class Renderer {
     const cx = this.hexSize * Math.sqrt(3) * (tile.x + 0.5 * (tile.y & 1));
     const cy = this.hexSize * (3 / 2) * tile.y;
     return { x: cx, y: cy };
+  }
+
+  /**
+   * Gets the translation offset used when drawing the map.
+   * This is needed to align drawings on an overlay canvas.
+   * @returns {{x: number, y: number}} The x and y translation offset.
+   */
+  getTranslationOffset() {
+    const x = (this.hexSize * Math.sqrt(3)) / 2 + this._padding;
+    const y = this.hexSize + this._padding;
+    return { x, y };
   }
 
   /**
@@ -177,8 +184,9 @@ export default class Renderer {
    * Draws an outline around a set of tiles, excluding shared edges.
    * @param {HexTile[]} tiles An array of HexTile objects to outline.
    * @param {Object} style The style object for the outline (strokeStyle, lineWidth).
+   * @param {CanvasRenderingContext2D} [ctx=this.ctx] The rendering context to draw on. Defaults to the main canvas context.
    */
-  tileOutline(tiles, style) {
+  tileOutline(tiles, style, ctx = this.ctx) {
     if (!tiles || tiles.length === 0) return;
 
     const edgeIds = new Set();
@@ -217,10 +225,10 @@ export default class Renderer {
     }
 
     // 3. Draw the non-shared edges.
-    this.ctx.save(); // Save the current context state
-    this.ctx.strokeStyle = style.strokeStyle;
-    this.ctx.lineWidth = style.lineWidth;
-    this.ctx.setLineDash(Config.tileOutlineDash);
+    ctx.save(); // Save the current context state
+    ctx.strokeStyle = style.strokeStyle;
+    ctx.lineWidth = style.lineWidth;
+    ctx.setLineDash(Config.tileOutlineDash);
 
 
     for (const edgeId of edgesToDraw) {      
@@ -229,13 +237,13 @@ export default class Renderer {
       const p2 = this._getVertexPixelCoords(vertexId2, this.map);
       
       if (p1 && p2) {
-        this.ctx.beginPath();
-        this.ctx.moveTo(p1.x, p1.y);
-        this.ctx.lineTo(p2.x, p2.y);
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
       }
     }
-    this.ctx.restore();    
+    ctx.restore();    
   }
 
   

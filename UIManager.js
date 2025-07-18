@@ -9,6 +9,7 @@ import { Building } from './Building.js';
 import { Resource } from './Resource.js';
 import { ResourceLibrary } from './ResourceLibrary.js';
 import PlacementResolver from './PlacementResolver.js';
+import { renderContext } from './main.js';
 import { drawEndIndicator } from './ui/drawing.js';
 
 /**
@@ -25,6 +26,7 @@ export default class UIManager {
     // These will be populated by the Game class after initialization.
     this.player = null;
     this.map = null;
+    this.renderer = null;
 
     // Get references to the containers in the DOM.
     this.configPanelContainer = document.getElementById('config-panel');
@@ -86,7 +88,22 @@ export default class UIManager {
       this.updateTilePreviews();
       this.updateTileCounter();
     });
-    this.eventEmitter.on('HEX_HOVERED', payload => this.updateTooltip(payload));
+    this.eventEmitter.on('HEX_HOVERED', payload => {
+      const { tile } = payload;
+      let placementInfo = null;
+
+      // Calculate placement info only if there's a tile, it's empty, and the player has a building.
+      if (tile && !tile.contentType && this.player?.currentTileInHand && this.map) {
+        const baseBuildingId = this.player.currentTileInHand;
+        placementInfo = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+      }
+
+      // Add placementInfo to the payload for the other functions to use.
+      const newPayload = { ...payload, placementInfo };
+
+      this.updateTooltip(newPayload);
+      this.drawPlacementPreview(newPayload);
+    });
   }
 
   /**
@@ -94,10 +111,12 @@ export default class UIManager {
    * @param {import('./Player.js').default} player The game's player instance.
    * @param {import('./Map.js').default} map The game's map instance.
    */
-  setContext(player, map) {
+    setContext(player, map, renderer) {
     this.player = player;
     this.map = map;
+    this.renderer = renderer;
   }
+
 
   /**
    * Creates the configuration sliders for map generation.
@@ -282,10 +301,10 @@ export default class UIManager {
 
   /**
    * Updates the tooltip's content and position based on the hovered tile.
-   * @param {{tile: import('./HexTile.js').default|null, event: MouseEvent|null}} payload The event payload from the InputHandler.
+    * @param {{tile: import('./HexTile.js').default|null, event: MouseEvent|null, placementInfo: object|null}} payload The event payload.
    */
   updateTooltip(payload) {
-    const { tile, event } = payload;
+     const { tile, event, placementInfo } = payload;
 
     if (tile && event) {
       // Construct the tooltip text, including the feature name if one exists.
@@ -312,10 +331,9 @@ export default class UIManager {
         } else {
           console.warn('Unknown content type in tooltip:', tile.contentType);
         }
-      } else if (this.player?.currentTileInHand && this.map) {
+      } else if (placementInfo) {
         // If the tile is empty and the player is holding a building, show placement preview.
-        const baseBuildingId = this.player.currentTileInHand;
-        const result = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+        const result = placementInfo;
 
         if (result.isValid) {
           const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
@@ -323,7 +341,7 @@ export default class UIManager {
 
           // Determine the building name to display. If a transformation has a `name`, use it; otherwise, use the base building name.
           let buildingName = buildingDef.name; // Default to base building name
-          if (result.resolvedBuildingId !== baseBuildingId) {
+          if (result.resolvedBuildingId !== this.player.currentTileInHand) {
             // Check if this transformation has a specific name (Residence transformations).
             const transformDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
             if (transformDef?.name) {
@@ -362,6 +380,84 @@ export default class UIManager {
         // If the tile AND event are null (mouse off canvas), hide the tooltip.
         // This condition isolates the 'mouse off' case.
         this.tooltipContainer.style.display = 'none';
+    }
+  }
+
+  /**
+   * Clears any temporary drawings from the overlay canvas.
+   */
+  clearPlacementPreview() {
+    const { canvas, ctx } = renderContext.overlay;
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  /**
+   * Draws a preview of a potential building placement on the overlay canvas.
+   * This includes score-based shading, resource claim outlines, and the building icon.
+    * @param {{tile: import('./HexTile.js').default|null, placementInfo: object|null}} payload The event payload.
+   */
+  drawPlacementPreview(payload) {
+    this.clearPlacementPreview();
+
+    const { tile, placementInfo } = payload;
+    // We only draw a preview if the placement is valid.
+    if (!tile || !placementInfo || !placementInfo.isValid) {
+      return;
+    }
+
+    // --- 1. Determine Shading Color ---
+    let shadeColor = null;
+    const score = placementInfo.score.total;
+
+    const shading = Config.UIConfig.previewShading;
+    if (score < 0) {
+      shadeColor = shading.negative;
+    } else if (score === 2) {
+      shadeColor = shading.positive_ok;
+    } else if (score > 2) {
+      shadeColor = shading.positive_good;
+    }
+
+    // --- 2. Draw the Shading (if applicable) ---
+    if (shadeColor) {
+      const { ctx } = renderContext.overlay;
+      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
+      const { x: tileX, y: tileY } = this.renderer.tileToPixel(tile);
+      const hexSize = this.renderer.hexSize;
+
+      ctx.fillStyle = shadeColor;
+      DrawingUtils.drawHexPath(ctx, tileX + offsetX, tileY + offsetY, hexSize);
+      ctx.fill();
+    }
+
+    // --- 3. Draw Building Icon ---
+    // We draw the icon of the building that *would* be placed, including transformations.
+    const buildingDef = BuildingDefinitionMap.get(placementInfo.resolvedBuildingId);
+    if (buildingDef?.draw) {
+      const { ctx } = renderContext.overlay;
+      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
+      const { x: tileX, y: tileY } = this.renderer.tileToPixel(tile);
+      const hexSize = this.renderer.hexSize;
+
+      // DrawingUtils.drawDetails handles its own translation, so we pass the final screen coordinates.
+      DrawingUtils.drawDetails(ctx, buildingDef, tileX + offsetX, tileY + offsetY, hexSize);
+    }
+
+    // --- 4. Draw Resource Claim Outline ---
+    if (placementInfo.claimedResourceTile) {
+      const { ctx } = renderContext.overlay;
+      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
+
+      ctx.save();
+      ctx.translate(offsetX, offsetY); // Apply the same offset as the main renderer.
+
+      const tilesToOutline = [tile, placementInfo.claimedResourceTile];
+      // Call the refactored method, passing the overlay context.
+      this.renderer.tileOutline(tilesToOutline, Config.tileOutlineStyle, ctx);
+
+      ctx.restore(); // Remove the translation.
     }
   }
 

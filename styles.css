@@ -122,6 +122,19 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   text-align: center;
 }
+.canvas-wrapper {
+  /* This wrapper ensures the overlay canvas is positioned correctly relative to the game canvas */
+  position: relative;
+  /* The wrapper should size itself to the canvas within it */
+  display: inline-block;
+}
+#game-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Allows mouse events to pass through to the canvas below */
+  pointer-events: none;
+}
 h1 {
   margin: 0;
   font-size: 1.2rem;
