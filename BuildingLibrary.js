@@ -27,17 +27,69 @@ export const BuildingLibrary = {
     transformModel: 'exclusive', // Chooses the single best transformation.
     transformations: [
       {
+        id: 'Mine',
+        conditions: [{ type: 'feature', id: 'hills' }],
+      },
+      {
         id: 'IronMine',
         conditions: [{ type: 'adjacentToResource', id: 'Iron', claimed: false }],
+      },
+      {
+        id: 'GoldMine',
+        conditions: [{ type: 'adjacentToResource', id: 'Gold', claimed: false }],
+      },
+      {
+        id: 'Stonecutter',
+        conditions: [{ type: 'adjacentToBiome', id: 'mountain' }], //how do we choose between multiple options
       },
       {
         id: 'Quarry',
         conditions: [{ type: 'adjacentToResource', id: 'Stone', claimed: false }],
       },
+
       {
-        id: 'Mine',
-        conditions: [{ type: 'feature', id: 'hills' }],
+        id: 'Woodcutter',
+        conditions: [{ type: 'feature', id: 'forest' }],
       },
+      {
+        id: 'Lumbermill',
+        conditions: [
+          { type: 'feature', id: 'forest' },
+          { type: 'adjacentToResource', id: 'Wood', claimed: false },
+        ],
+      },
+      {
+        id: 'Croft',
+        conditions: [
+          { type: 'onBiome', id: 'plains'  },
+          { type: 'adjacentToRiver'},
+        ], 
+      },
+      {
+        id: 'Farm',
+        conditions: [
+          { type: 'adjacentToResource', id: 'Grain', claimed: false },
+          { type: 'onBiome', id: 'plains' },
+          { type: 'adjacentToRiver' }, // might want to relax this to just grain and plains
+        ], 
+      },
+      {
+        id: 'FishingHut',
+        conditions: [{ type: 'adjacentToBiome', id: ['ocean', 'lake']}],
+      },
+      {
+        id: 'Fishery',
+        conditions: [{ type: 'adjacentToResource', id: 'Fish', claimed: false }],
+      },
+      {
+        id: 'HerdersHut',
+        conditions: [{ type: 'onBiome', id: 'steppe'}],
+      },
+      {
+        id: 'CattleFarm',
+        conditions: [{ type: 'adjacentToResource', id: 'Cattle', claimed: false }],
+      },
+
     ],
     draw: {
       type: 'shapes',
@@ -58,7 +110,30 @@ export const BuildingLibrary = {
       {
         id: 'PollutedSlum',
         isNegative: true,
-        conditions: [{ type: 'adjacentToBuilding', id: ['Mine', 'IronMine'] }],
+        conditions: [{ type: 'adjacentToBuilding', id: ['Mine', 'IronMine', 'GoldMine'] }],
+      },
+      {
+        id: 'NoisyHomes',
+        isNegative: true,
+        conditions: [{ type: 'adjacentToBuilding', id: ['Quarry', 'Lumbermill'] }],
+      },
+      {
+        id: 'AridAbodes',
+        isNegative: true,
+        conditions: [
+          { type: 'onBiome', id: 'desert' },
+          { type: 'adjacentToFeature', id: 'oasis', invert: true},//and not adjacent to oasis
+        ], 
+      },
+      {
+        id: 'FrigidHamlet',
+        isNegative: true,
+        conditions: [{ type: 'onBiome', id: 'tundra' }],
+      },
+      {
+        id: 'WildernessHuts',
+        isNegative: true,
+        conditions: [{ type: 'feature', id: 'forest' }],
       },
       // Positive bonuses.
       {
@@ -75,11 +150,11 @@ export const BuildingLibrary = {
       },
       {
         id: 'SeafrontHomes',
-        conditions: [{ type: 'adjacentToBiome', id: ['ocean'] }],
+        conditions: [{ type: 'adjacentToBiome', id: 'ocean' }],
       },    
       {
         id: 'LakeLodges',
-        conditions: [{ type: 'adjacentToBiome', id: ['lake'] }],
+        conditions: [{ type: 'adjacentToBiome', id: 'lake' }],
       },   
       {
         id: 'WoodlandRetreat',
@@ -87,7 +162,7 @@ export const BuildingLibrary = {
        },
       {
         id: 'MountainViews',
-        conditions: [{ type: 'adjacentToBiome', id: ['mountain'] }],
+        conditions: [{ type: 'adjacentToBiome', id: 'mountain' }],
       },   
 //      {
  //       id: 'Farmstead',

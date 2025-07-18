@@ -1,22 +1,2 @@
-- negative scoring not working (polluted slums never placed)
-- buildings sometimes disappear
-- mine scored +3
-
-ScoringRules.js:173 Uncaught TypeError: Cannot read properties of undefined (reading 'some')
-    at ScoringRules.js:173:43
-    at Array.some (<anonymous>)
-    at LuxuryHomeScoringRule.evaluate (ScoringRules.js:171:75)
-    at ScoringEngine.js:78:66
-    at Array.reduce (<anonymous>)
-    at ScoringEngine.calculateScoreFor (ScoringEngine.js:78:29)
-    at PlacementResolver._determineFinalOutcome (PlacementResolver.js:135:37)
-    at PlacementResolver.resolvePlacement (PlacementResolver.js:45:31)
-    at UIManager.updateTooltip (UIManager.js:263:42)
-    at UIManager.js:59:57
-
-Diagnosis
-The LuxuryHomeScoringRule is trying to determine if it's next to a river by checking its neighbors for an edges property (neighbor.edges.some(...)). However, the HexTile class does not have an edges property.
-
-The correct way to check for an adjacent river, which is already implemented correctly in the PlacementResolver, is to get the vertices of the tile in question and see if any of the edges formed by those vertices are present in the map.rivers set.
-
-The LuxuryHomeScoringRule must be updated to use this correct logic.
+finish implementing all residence and industry types - you have a google doc with this stuff in it
+start to implement food/pop

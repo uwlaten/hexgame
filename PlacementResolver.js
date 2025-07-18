@@ -221,6 +221,12 @@ export default class PlacementResolver {
           if (condition.operator === 'exactly' && matchCount === condition.count) success = true;
           break;
       }
+
+      // NEW: Handle inverted conditions.
+      // If the condition has an 'invert' flag, we flip the result.
+      if (condition.invert) {
+        success = !success;
+      }
       if (!success) return false; // If any condition fails, the whole check fails.
     }
     return true; // All conditions passed.
