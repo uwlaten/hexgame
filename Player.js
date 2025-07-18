@@ -69,6 +69,25 @@ export default class Player {
   }
 
   /**
+   * Adds an array of new tiles to the player's deck and shuffles it.
+   * @param {string[]} tilesToAdd An array of building IDs to add to the deck.
+   */
+  addTilesToDeck(tilesToAdd) {
+    if (!tilesToAdd || tilesToAdd.length === 0) return;
+
+    // Add each new tile to the deck.
+    for (const tileId of tilesToAdd) {
+      this.deck.push(tileId);
+    }
+
+    // Shuffle the deck to integrate the new tiles.
+    this._shuffleArray(this.deck);
+
+    // Announce that the deck has changed so the UI can update.
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
+  }
+
+  /**
    * Draws a new building type from the player's deck to their hand.
    * Emits a PLAYER_TILE_HAND_UPDATED event.
    */

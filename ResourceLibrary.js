@@ -1,6 +1,11 @@
 /**
  * @fileoverview Defines the data for all resource types in the game.
  * This provides a single source of truth for resource properties.
+ *
+ * Each resource can have the following optional reward properties:
+ * - uniqueTileReward: The ID of a specific, unique building tile to grant when this resource is claimed.
+ * - rewardBundle: The key of a reward bundle defined in Config.js to use for granting random tiles.
+ *   If omitted, the 'default' bundle will be used.
  */
 
 export const ResourceLibrary = {
@@ -15,6 +20,8 @@ export const ResourceLibrary = {
         { type: 'polygon', fillStyle: '#5E6971', params: [ [-0.3, -0.1], [0.3, -0.1], [0.35, 0.1], [0.2, 0.3], [-0.2, 0.3], [-0.35, 0.1] ] },
       ],
     },
+    uniqueTileReward: 'Forge',
+    rewardBundle: 'IndustryBundle',
   },
   FISH: {
     id: 'Fish',
@@ -28,6 +35,8 @@ export const ResourceLibrary = {
         { type: 'polygon', fillStyle: '#4682B4', params: [ [0.2, 0], [0.4, -0.2], [0.4, 0.2] ] },
       ],
     },
+    uniqueTileReward: 'Smokehouse',
+    rewardBundle: 'ResidentialBundle',
   },
   GRAIN: {
     id: 'Grain',
@@ -53,6 +62,8 @@ export const ResourceLibrary = {
         { type: 'polygon', params: [ [-0.04, -0.25], [0, -0.4], [0.04, -0.25] ] },
       ],
     },
+    uniqueTileReward: 'Bakery',
+    rewardBundle: 'ResidentialBundle',
   },
   WOOD: {
     id: 'Wood',
@@ -66,6 +77,8 @@ export const ResourceLibrary = {
         { type: 'rect', fillStyle: '#A0522D', params: [-0.3, 0.1, 0.7, 0.2] },
       ],
     },
+    uniqueTileReward: 'Sawmill',
+    rewardBundle: 'IndustryBundle',
   },
   STONE: {
     id: 'Stone',
@@ -79,6 +92,8 @@ export const ResourceLibrary = {
         { type: 'polygon', fillStyle: '#808080', params: [ [0.1, 0.1], [0.4, 0.2], [0.2, 0.4] ] },
       ],
     },
+    uniqueTileReward: 'Mason',
+    rewardBundle: 'IndustryBundle',
   },
   GOLD: {
     id: 'Gold',
@@ -92,6 +107,8 @@ export const ResourceLibrary = {
         { type: 'polygon', fillStyle: '#FFD700', strokeStyle: '#DAA520', lineWidth: 1, params: [ [-0.25, -0.2], [0.25, -0.2], [0.2, 0.2], [-0.2, 0.2] ] },
       ],
     },
+    uniqueTileReward: 'Mint',
+    rewardBundle: 'IndustryBundle',
   },
   CATTLE: {
     id: 'Cattle',
@@ -106,5 +123,7 @@ export const ResourceLibrary = {
         { type: 'rect', fillStyle: '#E0E0E0', strokeStyle: '#BDBDBD', lineWidth: 1, params: [-0.15, -0.3, 0.3, 0.1] },  // Top/cap area
       ],
     },
+    uniqueTileReward: 'Tannery',
+    rewardBundle: 'ResidentialBundle',
   },
 };

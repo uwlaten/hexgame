@@ -197,6 +197,47 @@ export default {
       // Color for a placement with a score greater than 2.
       positive_good: 'rgba(0, 100, 0, 0.5)',
     },
+    // Duration in milliseconds for toast notifications to stay on screen.
+    notificationDuration: 5000,
+    // Duration in milliseconds for the notification fade-in/out transition. Must match CSS.
+    notificationTransitionDuration: 500,
+  },
+
+  /**
+   * Holds all tunable parameters for resource claim rewards.
+   */
+  RewardConfig: {
+    // This is the master list of all reward bundles.
+    bundles: {
+      // The default bundle, used if a resource doesn't specify one.
+      default: {
+        message: "+2 Tiles", // Message part for this bundle
+        count: 2,            // Number of random tiles to award
+        pool: [              // Weighted pool for random selection
+          { id: 'Industry', weight: 1 },
+          { id: 'Residence', weight: 1 },
+          { id: 'Road', weight: 1 }
+        ]
+      },
+      // A specific bundle for industrial resources.
+      IndustryBundle: {
+        message: "+2 Industrial Tiles",
+        count: 2,
+        pool: [
+          { id: 'Industry', weight: 7 },
+          { id: 'Road', weight: 3 }
+        ]
+      },
+      // A specific bundle for residential/food resources.
+      ResidentialBundle: {
+        message: "+2 Residential Tiles",
+        count: 2,
+        pool: [
+          { id: 'Residence', weight: 8 },
+          { id: 'Road', weight: 2 }
+        ]
+      }
+    }
   },
 
   /**

@@ -28,6 +28,12 @@ export default class UIManager {
     this.map = null;
     this.renderer = null;
 
+    /**
+     * An array to keep track of active toast notifications.
+     * @type {HTMLElement[]}
+     */
+    this.activeNotifications = [];
+
     // Get references to the containers in the DOM.
     this.configPanelContainer = document.getElementById('config-panel');
     this.scoreContainer = document.getElementById('score-container');
@@ -95,8 +101,12 @@ export default class UIManager {
       // ensuring the final map render has completed before showing the popup.
       setTimeout(() => this.showGameOverPopup(), 100);
     });
+    this.eventEmitter.on('TILES_AWARDED', message => this._showNotification(message));
     // Also listen for a new game request to hide the popup if it's open.
-    this.eventEmitter.on('NEW_GAME_REQUESTED', () => this.hideGameOverPopup());
+    this.eventEmitter.on('NEW_GAME_REQUESTED', () => {
+      this.hideGameOverPopup();
+      this._clearAllNotifications();
+    });
 
     this.eventEmitter.on('HEX_HOVERED', payload => {
       const { tile } = payload;
@@ -445,6 +455,60 @@ export default class UIManager {
     scoreText.textContent = `Your final score is: ${this.player.score}`;
 
     this.gameOverPopup.style.display = 'flex';
+  }
+
+  /**
+   * Removes all active toast notifications from the screen.
+   * This is called when a new game starts to prevent old notifications from persisting.
+   * @private
+   */
+  _clearAllNotifications() {
+    for (const notification of this.activeNotifications) {
+      notification.remove();
+    }
+    this.activeNotifications = [];
+  }
+
+  /**
+   * Displays a temporary "toast" notification on the screen.
+   * The notification will require CSS for styling and animation.
+   * @param {string} message The message to display.
+   * @private
+   */
+  _showNotification(message) {
+    // Ensure the notification is appended relative to the game area, not the whole page.
+    const container = this.renderer?.canvas.parentElement;
+    if (!container) {
+      console.error("Cannot show notification: Game container not found.");
+      return;
+    }
+
+    const notification = document.createElement('div');
+    notification.className = 'toast-notification';
+    notification.textContent = message;
+
+    container.appendChild(notification);
+    this.activeNotifications.push(notification);
+
+    // A small delay ensures the element is in the DOM before the 'show' class is added,
+    // allowing the CSS transition to trigger correctly.
+    setTimeout(() => {
+      notification.classList.add('show');
+    }, 10);
+
+    // Set a timer to start the fade-out process.
+    setTimeout(() => {
+      notification.classList.remove('show');
+
+      // Set a second, reliable timer to remove the element from the DOM after
+      // the CSS fade-out transition has completed. This avoids relying on the
+      // sometimes-unreliable 'transitionend' event.
+      setTimeout(() => {
+        notification.remove();
+        const index = this.activeNotifications.indexOf(notification);
+        if (index > -1) this.activeNotifications.splice(index, 1);
+      }, Config.UIConfig.notificationTransitionDuration);
+    }, Config.UIConfig.notificationDuration);
   }
 
   /**
