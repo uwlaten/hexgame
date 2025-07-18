@@ -94,7 +94,7 @@ export default class Game {
       this._handleResourceClaim(newBuilding, tile);
 
       // Announce that a building has been placed for other systems to react to.
-      this.eventEmitter.emit('BUILDING_PLACED', tile);
+      this.eventEmitter.emit('BUILDING_PLACED', tile, result.appliedTransformations);
 
       // If the City Centre was just placed, update the player state.
       if (baseBuildingId === 'CityCentre') {

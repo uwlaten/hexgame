@@ -23,7 +23,7 @@ export default class PlacementResolver {
    * @param {import('./HexTile.js').default} targetTile The tile where placement is attempted.
    * @param {import('./Map.js').default} map The game map.
    * @param {import('./Player.js').default} player The player making the placement.
-   * @returns {{isValid: boolean, resolvedBuildingId: string|null, score: number}} An object describing the outcome.
+   * @returns {{isValid: boolean, resolvedBuildingId: string|null, score: object, appliedTransformations: object[]}} An object describing the outcome.
    */
   static resolvePlacement(baseBuildingId, targetTile, map, player) {
     
@@ -33,7 +33,7 @@ export default class PlacementResolver {
     // Delegate the initial hard-blocking checks to PlacementRules.
     const canPlace = PlacementRules.canPlaceBuilding(targetTile, baseBuildingId, player, map);
 
-    if (!canPlace) return { isValid: false, resolvedBuildingId: null, score: 0 };
+    if (!canPlace) return { isValid: false, resolvedBuildingId: null, score: { total: 0, breakdown: [] }, appliedTransformations: [] };
 
     // Phase 3: Find and Score All Possible Transformations
     const baseBuildingDef = BuildingDefinitionMap.get(baseBuildingId);
@@ -47,7 +47,7 @@ export default class PlacementResolver {
     // Re-check if placing this building would invalidate a future placement on an adjacent tile.
     // Now that we know the final outcome, we can check using the resolved building ID.
     if (this._preservesAdjacentValue(finalOutcome.id, targetTile, map, player, finalOutcome.id)) {
-      return { isValid: false, resolvedBuildingId: null, score: 0 };
+      return { isValid: false, resolvedBuildingId: null, score: { total: 0, breakdown: [] }, appliedTransformations: [] };
     }
 
     // Phase 4: Determine the Final Outcome based on game rules
@@ -57,11 +57,16 @@ export default class PlacementResolver {
       isValid: true,
       resolvedBuildingId: finalOutcome.id,
       score: finalOutcome.score,
+      appliedTransformations: finalOutcome.appliedTransformations,
     };
   }
 
   /**
    * Checks if placing a building would create a negative-scoring situation for adjacent tiles.
+   * Note - this by design does not apply to empty tiles.
+   * The purpose is to close a loophole in which the player places a positively-scoring building A (e.g. a Hilltop Villa),
+   * then places a building B adjacent to it which would have prevented the placement of A (e.g. a Mine, which would make A
+   * into a Polluted Slum).
    * @private
    */
   static _preservesAdjacentValue(placingId, placingTile, map, player, resolvedBuildingId) {
@@ -98,6 +103,7 @@ export default class PlacementResolver {
   /**
    * Finds all valid transformations for a building on a tile and calculates their scores.
    * @param {object} context - Optional context for hypothetical checks.
+   * @returns {Array<{transform: object, score: object}>} An array of valid outcomes, each with the transformation definition and its score report.
    * @private
    */
   static _getPossibleOutcomes(baseBuildingDef, targetTile, map, context = {}) {
@@ -131,7 +137,7 @@ export default class PlacementResolver {
 
         // Calculate score on the cloned, modified tile. The original tile is untouched.
         const score = ScoringEngine.calculateScoreFor(transform.id, clonedTile, map);
-        outcomes.push({ id: transform.id, isNegative: transform.isNegative || false, score });
+        outcomes.push({ transform, score });
       }
     }
     return outcomes;
@@ -139,14 +145,21 @@ export default class PlacementResolver {
 
   /**
    * Determines the final building and score from a list of possible outcomes.
+   * @returns {{id: string, score: object, appliedTransformations: object[]}} The final outcome.
    * @private
    */
   static _determineFinalOutcome(outcomes, baseBuildingDef, targetTile, map) {
     // Rule: Negative transformations trump all positives.
-    const negativeOutcome = outcomes.find(o => o.isNegative && o.score.total < 0);
-    if (negativeOutcome) return negativeOutcome;
+    const negativeOutcome = outcomes.find(o => o.transform.isNegative && o.score.total < 0);
+    if (negativeOutcome) {
+      return {
+        id: negativeOutcome.transform.id,
+        score: negativeOutcome.score,
+        appliedTransformations: [negativeOutcome.transform],
+      };
+    }
 
-    const positiveOutcomes = outcomes.filter(o => !o.isNegative);
+    const positiveOutcomes = outcomes.filter(o => !o.transform.isNegative);
 
     // If no transformations apply, return the base building.
     if (positiveOutcomes.length === 0) {
@@ -154,7 +167,7 @@ export default class PlacementResolver {
       const tempBuilding = new Building(baseBuildingDef.id);
       clonedTile.setContent(tempBuilding);
       const score = ScoringEngine.calculateScoreFor(baseBuildingDef.id, clonedTile, map);
-      return { id: baseBuildingDef.id, score };
+      return { id: baseBuildingDef.id, score, appliedTransformations: [] };
     }
 
     // Handle 'additive' model (e.g., Residence)
@@ -165,8 +178,16 @@ export default class PlacementResolver {
         const clonedTile = targetTile.clone();
         const tempBuilding = new Building(resolvedId);
         clonedTile.setContent(tempBuilding);
-        const score = ScoringEngine.calculateScoreFor(resolvedId, clonedTile, map);
-        return { id: resolvedId, score };
+        // --- FIX ---
+        // Pass the list of transformations to the scoring engine so it has the
+        // context to score a Luxury Home correctly, respecting separation of concerns.
+        const transformations = positiveOutcomes.map(o => o.transform);
+        const score = ScoringEngine.calculateScoreFor(resolvedId, clonedTile, map, transformations);
+        return {
+          id: resolvedId,
+          score,
+          appliedTransformations: transformations,
+        };
       }
     }
 
@@ -174,7 +195,12 @@ export default class PlacementResolver {
     // Sort by score (highest first) and return the best one.
     // Note: The score object now has a 'total' property.
     positiveOutcomes.sort((a, b) => b.score.total - a.score.total);
-    return positiveOutcomes[0];
+    const bestOutcome = positiveOutcomes[0];
+    return {
+      id: bestOutcome.transform.id,
+      score: bestOutcome.score,
+      appliedTransformations: [bestOutcome.transform],
+    };
   }
 
   /**

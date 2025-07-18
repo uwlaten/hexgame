@@ -25,9 +25,12 @@ export class ScoringRule {
   /**
    * Evaluates the score for a given game action.
    * @param {import('./HexTile.js').default} tile The tile related to the event.
-   * @returns {number} The score awarded by this rule.
+   * @param {string} buildingId The ID of the building being evaluated.
+   * @param {import('./Map.js').default} map The game map.
+   * @param {object[]} [appliedTransformations=[]] The list of transformation definitions that were applied to this building.
+   * @returns {Array<{rule: string, reason: string, points: number}>} An array of score components.
    */
-  evaluate(tile, buildingId, map) {
+  evaluate(tile, buildingId, map, appliedTransformations = []) {
     throw new Error("Method 'evaluate()' must be implemented.");
   }
 }
@@ -40,7 +43,7 @@ export class ScoringRule {
  * Base score for any valid building placement.
  */
 export class BasePlacementScore extends ScoringRule {
-  evaluate(tile, buildingId, map) {
+  evaluate(tile, buildingId, map, appliedTransformations) {
     const isValid = tile.contentType instanceof Building;
 
     return [{
@@ -57,7 +60,7 @@ export class BasePlacementScore extends ScoringRule {
  * in BuildingLibrary.js, with sensible defaults.
  */
 export class TransformationScoreRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
+  evaluate(tile, buildingId, map, appliedTransformations) {
     const building = tile.contentType;
     if (!(building instanceof Building)) return [];
 
@@ -102,7 +105,7 @@ export class TransformationScoreRule extends ScoringRule {
  * It checks for the data link between the building and the resource tile.
  */
 export class ClaimedResourceScoreRule extends ScoringRule {
-  evaluate(tile, buildingId, map) {
+  evaluate(tile, buildingId, map, appliedTransformations) {
     const building = tile.contentType;
     // 1. Check if it's a building and if it has claimed a resource.
     // The `claimedResourceTile` property is our proof of a successful claim.
@@ -134,31 +137,25 @@ export class ClaimedResourceScoreRule extends ScoringRule {
  * Score for placing a Luxury Home, based on the number of valid positive transformations.
  */
 export class LuxuryHomeScoringRule extends ScoringRule{
-  evaluate(tile, buildingId, map) {
+  evaluate(tile, buildingId, map, appliedTransformations = []) {
     const isLuxuryHome = tile.contentType instanceof Building && tile.contentType.type === BuildingLibrary.LUXURY_HOME.id;
     if (!isLuxuryHome) {
       return []; // Return an empty array if not a LuxuryHome
     }
-  
-    // 1. Get the base building definition and its positive transformations.
-    const baseBuildingDef = BuildingDefinitionMap.get(BuildingLibrary.RESIDENCE.id);
-    const positiveTransformations = baseBuildingDef.transformations.filter(t => !t.isNegative);
-  
-    // 2. Count how many transformations are valid on this tile.
-    let validBonusCount = 0;
-    for (const transform of positiveTransformations) {
-      // Pass an empty context object {} to prevent errors in _checkConditions.
-      if (PlacementResolver._checkConditions(tile, transform.conditions, map, {})) {
-        validBonusCount++;
-      }
-    }
-  
-    // 3. Return the count as the score.
-    const breakdown = [];
-    breakdown.push({ rule: "LuxuryHomeScoringRule", reason: "Valid residential bonuses", points: validBonusCount });
-    
-    return breakdown;
-  }  
+
+    // The score is now simply the number of positive transformations that were applied,
+    // which is passed directly to this rule. This is more efficient and decouples
+    // the scoring rule from the PlacementResolver's internal logic.
+    const bonusCount = appliedTransformations.length;
+
+    if (bonusCount === 0) return [];
+
+    return [{
+      rule: "LuxuryHomeScoringRule",
+      reason: `Combined ${bonusCount} residential bonuses`,
+      points: bonusCount,
+    }];
+  }
 }
 
 /**

@@ -68,9 +68,10 @@ export default class ScoringEngine {
    * @param {string} buildingId The ID of the building from BuildingLibrary.
    * @param {import('./HexTile.js').default} tile The tile where the building would be placed.
    * @param {import('./Map.js').default} map The game map.
-   * @returns {number} The calculated score for the hypothetical placement.
+   * @param {object[]} [appliedTransformations=[]] Optional list of transformations for context-dependent scoring.
+   * @returns {object} The calculated score report for the hypothetical placement.
    */
-  static calculateScoreFor(buildingId, tile, map){
+  static calculateScoreFor(buildingId, tile, map, appliedTransformations = []) {
     // In this static version, we create a temporary ScoringEngine with the
     // registered rules, but without a player to update. We then use it to
     // evaluate the score. Note that a temporary event emitter is still
@@ -78,14 +79,14 @@ export default class ScoringEngine {
     // no events will ever be emitted on it, as this method is purely
     // for calculation.
     const tempEngine = new ScoringEngine(new EventEmitter(), null);
-    const breakdown = tempEngine._calculateScore(buildingId, tile, map);
+    const breakdown = tempEngine._calculateScore(buildingId, tile, map, appliedTransformations);
     return ScoringEngine.createScoreReport(breakdown);
   }
 
-  _calculateScore(buildingId, tile, map) {
+  _calculateScore(buildingId, tile, map, appliedTransformations) {
     // Use flatMap to iterate over all rules, evaluate them (which returns an array of score components),
     // and flatten the resulting array of arrays into a single array.
-    const allComponents = this.rules.flatMap(rule => rule.evaluate(tile, buildingId, map));
+    const allComponents = this.rules.flatMap(rule => rule.evaluate(tile, buildingId, map, appliedTransformations));
 
     // Filter out any components that have zero points to keep the final report clean.
     return allComponents.filter(component => component.points !== 0);
@@ -97,11 +98,12 @@ export default class ScoringEngine {
   /**
    * Handles the BUILDING_PLACED event, calculates score changes, and updates the player.
    * @param {import('./HexTile.js').default} tile The tile where the building was placed.
+   * @param {object[]} appliedTransformations The list of transformations that were applied.
    * @private
    */
-  _handleBuildingPlaced(tile) {
+  _handleBuildingPlaced(tile, appliedTransformations) {
     const buildingId = tile.contentType.type;
-    const breakdown = this._calculateScore(buildingId, tile, tile.map);
+    const breakdown = this._calculateScore(buildingId, tile, tile.map, appliedTransformations);
 
     const scoreReport = ScoringEngine.createScoreReport(breakdown);
 

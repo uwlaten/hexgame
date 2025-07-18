@@ -406,7 +406,7 @@ export const BuildingLibrary = {
       type: 'shapes',
       useSizeFactor: true,
       shapes: [
-        { type: 'circle', fillStyle: '#F5DEB3', params: [0, 0, 0.3] }, // Yurt shape
+        { type: 'circle', fillStyle: '#684505ff', params: [0, 0, 0.3] }, // Yurt shape
         { type: 'polygon', fillStyle: '#DAA520', params: [ [-0.3, 0], [0.3, 0], [0, -0.3] ] }, // Conical roof
       ],
     },
@@ -465,8 +465,10 @@ export const BuildingLibrary = {
       type: 'shapes',
       useSizeFactor: true,
       shapes: [
-        { type: 'polygon', fillStyle: '#D2B48C', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1], [0, -0.4], [-0.3, -0.1] ] },
-        { type: 'rect', fillStyle: '#8B4513', params: [-0.15, 0, 0.1, 0.2] },
+        // A log-cabin style house
+        { type: 'polygon', fillStyle: '#8B4513', params: [ [-0.3, 0.4], [0.3, 0.4], [0.3, -0.1],  [0, -0.4], [-0.3, -0.1] ] },
+        // A brown roof to represent the forest
+        { type: 'polygon', fillStyle: '#f5d185ff', params: [ [-0.4, -0.1],  [0.4, -0.1], [0, -0.5] ] },
       ],
     },
   },
