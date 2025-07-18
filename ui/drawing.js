@@ -42,3 +42,5 @@ export function drawEndIndicator(canvas) {
     ctx.textBaseline = 'middle';
     ctx.fillText('END', centerX, centerY);
 }
+
+// adding a comment so I can save this
