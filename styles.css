@@ -115,6 +115,13 @@ body {
   /* Give a fixed height to prevent layout shifts when text appears/disappears */
   height: 1.2em;
 }
+.swap-instruction {
+  font-size: 0.8rem;
+  color: #ccc;
+  margin-top: 4px;
+  /* Give a fixed height to prevent layout shifts when text appears/disappears */
+  height: 1.2em;
+}
 .game-container {
   background-color: #222;
   padding: 1rem;
@@ -169,4 +176,10 @@ body {
 h1 {
   margin: 0;
   font-size: 1.2rem;
+}
+.active-choice {
+  border: 2px solid gold;
+  box-shadow: 0 0 10px gold;
+  border-radius: 8px; /* Optional: to round the corners of the highlight */
+  transition: border 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Optional: for a smooth transition effect when swapping */
 }

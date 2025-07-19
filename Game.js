@@ -37,6 +37,7 @@ export default class Game {
   init() {
     this.eventEmitter.on('HEX_CLICKED', this._handleHexClick.bind(this));
     this.eventEmitter.on('NEW_GAME_REQUESTED', this.reset.bind(this));
+    this.eventEmitter.on('SWAP_TILE_REQUESTED', () => this.player.swapActiveTile());
 
     // Provide the UIManager with access to the game state for previews.
     this.uiManager.setContext(this.player, this.map, this.renderer);
@@ -77,7 +78,7 @@ export default class Game {
    * @private
    */
   _handleHexClick(tile) {
-    const baseBuildingId = this.player.currentTileInHand;
+    const baseBuildingId = this.player.getActiveTile();
     if (!baseBuildingId) return; // Player has no building to place.
 
     // Use the PlacementResolver to determine the outcome of the placement.
@@ -103,13 +104,23 @@ export default class Game {
       // Announce that a building has been placed for other systems to react to.
       this.eventEmitter.emit('BUILDING_PLACED', tile, result.appliedTransformations);
 
-      // If the City Centre was just placed, update the player state.
+      // If the City Centre was just placed, update the player state and draw the initial hand.
       if (baseBuildingId === 'CityCentre') {
         this.player.cityCentrePlaced = true;
+        this.player.drawInitialHand();
+      } else {
+        // For any other tile, replenish the hand.
+        this.player.placeTileAndReplenish(this.player.activeTileIndex);
       }
 
-      // After placing, the player draws a new tile.
-      this.player.drawNewTile();
+      // After the hand is updated, check if there are any possible moves left.
+      // This can only happen after the city centre is placed and the player has a real hand.
+      if (this.player.cityCentrePlaced && this.player.hand.length > 0) {
+        if (this._checkForNoValidMoves()) {
+          // Pass a reason to the UIManager for a more specific game over message.
+          this.eventEmitter.emit('GAME_OVER', 'No more valid moves!');
+        }
+      }
 
 
       // Immediately update the tooltip on the placed tile
@@ -125,7 +136,40 @@ export default class Game {
     this.eventEmitter.emit('MAP_STATE_CHANGED');
   }
 
+  /**
+   * Checks if any tile in the player's hand has a valid placement on the board.
+   * @returns {boolean} True if no valid moves are found, false otherwise.
+   * @private
+   */
+  _checkForNoValidMoves() {
+    // This check is only relevant if the player has tiles to place.
+    if (this.player.hand.length === 0) return false;
 
+    // First, find all possible locations: empty tiles adjacent to existing buildings.
+    const possibleLocations = this.map.grid.flat().filter(tile => {
+      if (tile.contentType) return false; // Must be empty.
+
+      // Must be adjacent to at least one existing building.
+      return HexGridUtils.getNeighbors(tile.x, tile.y).some(coord => {
+        const neighbor = this.map.getTileAt(coord.x, coord.y);
+        return neighbor && neighbor.contentType instanceof Building;
+      });
+    });
+
+    // Now, check every tile in hand against every possible location.
+    for (const tileInHand of this.player.hand) {
+      for (const location of possibleLocations) {
+        const result = PlacementResolver.resolvePlacement(tileInHand, location, this.map, this.player);
+        if (result.isValid) {
+          // As soon as we find one valid move, we can stop.
+          return false;
+        }
+      }
+    }
+
+    // If we get through all checks without finding a valid move, the game is over.
+    return true;
+  }
   
 
   /**

@@ -27,6 +27,7 @@ export default class InputHandler {
     // 'this' inside _handleClick refers to the InputHandler instance.
     this._handleClick = this._handleClick.bind(this);
     this._handleMouseMove = this._handleMouseMove.bind(this);
+    this._handleKeyDown = this._handleKeyDown.bind(this);
   }
 
   /**
@@ -37,6 +38,23 @@ export default class InputHandler {
     this.canvas.addEventListener('mousemove', this._handleMouseMove);
     // Handle the case where the mouse leaves the canvas area entirely.
     this.canvas.addEventListener('mouseleave', () => this._handleMouseMove(null));
+    // Add a global keydown listener to handle tile swapping.
+    document.addEventListener('keydown', this._handleKeyDown);
+  }
+
+  /**
+   * Handles keydown events for global actions like swapping tiles.
+   * @param {KeyboardEvent} event The keyboard event.
+   * @private
+   */
+  _handleKeyDown(event) {
+    if (event.key === 'Tab') {
+      event.preventDefault(); // Prevent the browser's default tabbing behavior.
+      this.eventEmitter.emit('SWAP_TILE_REQUESTED');
+      if (this.lastHoveredTile != null) {
+        this.eventEmitter.emit('HEX_HOVERED', {tile: this.lastHoveredTile, event: null});
+      }
+    }
   }
 
   /**

@@ -61,6 +61,8 @@ export default class UIManager {
     this.currentTileNameDiv = null;
     this.nextTileNameDiv = null;
     this.gameOverPopup = null;
+    this.choice1Container = null;
+    this.choice2Container = null;
   }
 
   /**
@@ -90,17 +92,19 @@ export default class UIManager {
     this.currentTileNameDiv = document.getElementById('current-tile-name');
     this.nextTileNameDiv = document.getElementById('next-tile-name');
 
+    // Get references to the tile preview containers for highlighting
+    this.choice1Container = document.getElementById('current-tile-display');
+    this.choice2Container = document.getElementById('next-tile-display');
+
     // Subscribe to game events to keep the UI in sync.
     this.eventEmitter.on('SCORE_UPDATED', score => this.updateScore(score));
     this.eventEmitter.on('PLAYER_TILE_HAND_UPDATED', () => {
       this.updateTilePreviews();
       this.updateTileCounter();
     });
-    this.eventEmitter.on('GAME_OVER', () => {
-      // Use a minimal timeout to push this to the end of the event queue,
-      // ensuring the final map render has completed before showing the popup.
-      setTimeout(() => this.showGameOverPopup(), 100);
-    });
+    this.eventEmitter.on('GAME_OVER', (reason = 'The deck is empty!') => {
+      setTimeout(() => this.showGameOverPopup(reason), 100);
+    });    
     this.eventEmitter.on('TILES_AWARDED', message => this._showNotification(message));
     // Also listen for a new game request to hide the popup if it's open.
     this.eventEmitter.on('NEW_GAME_REQUESTED', () => {
@@ -113,8 +117,8 @@ export default class UIManager {
       let placementInfo = null;
 
       // Calculate placement info only if there's a tile, it's empty, and the player has a building.
-      if (tile && !tile.contentType && this.player?.currentTileInHand && this.map) {
-        const baseBuildingId = this.player.currentTileInHand;
+      if (tile && !tile.contentType && this.player?.getActiveTile() && this.map) {
+        const baseBuildingId = this.player.getActiveTile();
         placementInfo = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
       }
 
@@ -366,93 +370,80 @@ export default class UIManager {
     * @param {{tile: import('./HexTile.js').default|null, event: MouseEvent|null, placementInfo: object|null}} payload The event payload.
    */
   updateTooltip(payload) {
-     const { tile, event, placementInfo } = payload;
+    const { tile, event, placementInfo } = payload;
 
-    if (tile && event) {
-      // Construct the tooltip text, including the feature name if one exists.
-      let tooltipText = `Coords: (${tile.x}, ${tile.y}) | Biome: ${tile.biome.name}`;
-      if (tile.feature) {
-        tooltipText += ` | Feature: ${tile.feature.name}`;
-      }
+    if (!tile) {
+      // If there's no tile (e.g., mouse left canvas), hide the tooltip.
+      this.tooltipContainer.style.display = 'none';
+      return;
+    }
 
-      // Add information about the tile's content (building or resource).
-      if (tile.contentType) {
-        if (tile.contentType instanceof Building) {
-          // For buildings, the 'type' property holds the name (e.g., 'Residence').
-          tooltipText += ` | Building: ${tile.contentType.type}`;
-        } else if (tile.contentType instanceof Resource) {
-          // For resources, we need to look up the name in the ResourceLibrary
-          // using the resource's 'type' property.
-          const resourceDef = ResourceLibrary[tile.contentType.type.toUpperCase()];
-          if (resourceDef) {
-            tooltipText += ` | Resource: ${resourceDef.name}`;
-            if (tile.contentType.isClaimed) {
-              tooltipText += ' (Claimed)';
-            }
+    // --- Part 1: Construct the tooltip text ---
+    let tooltipText = `Coords: (${tile.x}, ${tile.y}) | Biome: ${tile.biome.name}`;
+    if (tile.feature) {
+      tooltipText += ` | Feature: ${tile.feature.name}`;
+    }
+
+    // Add information about the tile's content (building or resource).
+    if (tile.contentType) {
+      if (tile.contentType instanceof Building) {
+        tooltipText += ` | Building: ${tile.contentType.type}`;
+      } else if (tile.contentType instanceof Resource) {
+        const resourceDef = ResourceLibrary[tile.contentType.type.toUpperCase()];
+        if (resourceDef) {
+          tooltipText += ` | Resource: ${resourceDef.name}`;
+          if (tile.contentType.isClaimed) {
+            tooltipText += ' (Claimed)';
           }
-        } else {
-          console.warn('Unknown content type in tooltip:', tile.contentType);
         }
-      } else if (placementInfo) {
-        // If the tile is empty and the player is holding a building, show placement preview.
-        const result = placementInfo;
-
-        if (result.isValid) {
-          const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
-          const scoreText = result.score.total > 0 ? `+${result.score.total}` : result.score.total.toString();
-
-          // Determine the building name to display. If a transformation has a `name`, use it; otherwise, use the base building name.
-          let buildingName = buildingDef.name; // Default to base building name
-          if (result.resolvedBuildingId !== this.player.currentTileInHand) {
-            // Check if this transformation has a specific name (Residence transformations).
-            const transformDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
-            if (transformDef?.name) {
-              buildingName = transformDef.name; // Use transformation name if available
-            }
-          }
-
-          // Style the display based on the score.
-          let color = 'gray';  // Default for neutral scores
-          if (result.score.total > 0) {
-            color = 'green';  // Positive scores
-          } else if (result.score.total < 0) {
-            color = 'red';    // Negative scores
-          }
-          tooltipText += ` | Place: <span style="color:${color};">${buildingName} (${scoreText})</span>`;
-        } else {
-          tooltipText += ` | <span style="color:red;">Cannot build here</span>`;
-        }
+      } else {
+        console.warn('Unknown content type in tooltip:', tile.contentType);
       }
+    } else if (placementInfo) {
+      // If the tile is empty and the player is holding a building, show placement preview.
+      const result = placementInfo;
 
-      this.tooltipContainer.innerHTML = tooltipText; // Use innerHTML to render the span colors
-      this.tooltipContainer.style.display = 'block';
+      if (result.isValid) {
+        const buildingDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
+        const scoreText = result.score.total > 0 ? `+${result.score.total}` : result.score.total.toString();
+        
+        let buildingName = buildingDef.name; // Default to base building name
+        if (result.resolvedBuildingId !== this.player.getActiveTile()) {
+          const transformDef = BuildingDefinitionMap.get(result.resolvedBuildingId);
+          if (transformDef?.name) {
+            buildingName = transformDef.name;
+          }
+        }
 
-      // Position the tooltip near the cursor. The offset (e.g., +15px) prevents the
-      // tooltip from flickering by being directly under the cursor, which would
-      // trigger a 'mouseleave' event on the canvas.
+        let color = 'gray';
+        if (result.score.total > 0) color = 'green';
+        else if (result.score.total < 0) color = 'red';
+        tooltipText += ` | Place: <span style="color:${color};">${buildingName} (${scoreText})</span>`;
+      } else {
+        tooltipText += ` | <span style="color:red;">Cannot build here</span>`;
+      }
+    }
+
+    // --- Part 2: Update the DOM ---
+    this.tooltipContainer.innerHTML = tooltipText;
+    this.tooltipContainer.style.display = 'block';
+
+    // --- Part 3: Position the tooltip ONLY if there's a mouse event ---
+    if (event) {
       this.tooltipContainer.style.left = `${event.clientX + 15}px`;
       this.tooltipContainer.style.top = `${event.clientY + 15}px`;
-    } else if (tile) {
-      // Building placed: Update tooltip content but keep it visible at its last position.
-      let tooltipText = `Coords: (${tile.x}, ${tile.y}) | Building: ${tile.contentType.type}`;  // Show building info after placement.
-      this.tooltipContainer.innerHTML = tooltipText;
-      this.tooltipContainer.style.display = 'block'; // Ensure it's still visible.
-    }
-    else {
-        // If the tile AND event are null (mouse off canvas), hide the tooltip.
-        // This condition isolates the 'mouse off' case.
-        this.tooltipContainer.style.display = 'none';
     }
   }
 
   /**
    * Displays the game over popup with the final score.
+   * @param {string} [reason=''] The reason the game ended.
    */
-  showGameOverPopup() {
+  showGameOverPopup(reason = '') {
     if (!this.gameOverPopup || !this.player) return;
 
     const scoreText = this.gameOverPopup.querySelector('#final-score-text');
-    scoreText.textContent = `Your final score is: ${this.player.score}`;
+    scoreText.innerHTML = `Your final score is: ${this.player.score}<br><small>${reason}</small>`;
 
     this.gameOverPopup.style.display = 'flex';
   }
@@ -645,36 +636,49 @@ export default class UIManager {
   }
 
   /**
-   * Updates both the "Current Tile" and "Next Tile" previews.
-   * This function reads directly from the player's state.
+   * Updates the tile choice previews based on the player's hand.
    */
   updateTilePreviews() {
     if (!this.player) return;
 
-    const currentTileId = this.player.currentTileInHand;
-    // The "next" tile is the one at the top of the deck (which is the end of the array because of pop())
-    const nextTileId = this.player.deck.length > 0 ? this.player.deck[this.player.deck.length - 1] : null;
+    // Use the stored references from the init() method.
+    const { choice1Container, choice2Container } = this;
 
-    // Draw the current tile being placed
-    if (currentTileId) {
-      this._drawTilePreview(this.currentTileCtx, this.currentTileCanvas, currentTileId);
-      const buildingDef = BuildingDefinitionMap.get(currentTileId);
-      this.currentTileNameDiv.textContent = buildingDef?.name || '';
+    // Clear existing highlights
+    if (choice1Container) choice1Container.classList.remove('active-choice');
+    if (choice2Container) choice2Container.classList.remove('active-choice');
+
+    const hand = this.player.hand;
+    const activeIndex = this.player.activeTileIndex;
+
+    // Handle Choice 1 (always exists if hand has items)
+    if (hand.length > 0) {
+      const tileId1 = hand[0];
+      this._drawTilePreview(this.currentTileCtx, this.currentTileCanvas, tileId1);
+      const buildingDef1 = BuildingDefinitionMap.get(tileId1);
+      if (this.currentTileNameDiv) this.currentTileNameDiv.textContent = buildingDef1?.name || 'Place to Start';
+      if (activeIndex === 0 && choice1Container) {
+        choice1Container.classList.add('active-choice');
+      }
     } else {
-      // If there's no current tile, the game is likely over.
+      // Hand is empty, game over.
       drawEndIndicator(this.currentTileCanvas);
-      this.currentTileNameDiv.textContent = '';
+      if (this.currentTileNameDiv) this.currentTileNameDiv.textContent = '';
     }
 
-    // Draw the upcoming tile
-    if (nextTileId) {
-      this._drawTilePreview(this.nextTileCtx, this.nextTileCanvas, nextTileId);
-      const buildingDef = BuildingDefinitionMap.get(nextTileId);
-      this.nextTileNameDiv.textContent = buildingDef?.name || '';
+    // Handle Choice 2 (only exists after City Centre is placed)
+    if (hand.length > 1) {
+      const tileId2 = hand[1];
+      this._drawTilePreview(this.nextTileCtx, this.nextTileCanvas, tileId2);
+      const buildingDef2 = BuildingDefinitionMap.get(tileId2);
+      if (this.nextTileNameDiv) this.nextTileNameDiv.textContent = buildingDef2?.name || '';
+      if (activeIndex === 1 && choice2Container) {
+        choice2Container.classList.add('active-choice');
+      }
     } else {
-      // If there's no next tile, the deck is empty.
+      // Only one tile in hand (City Centre phase) or hand is empty.
       drawEndIndicator(this.nextTileCanvas);
-      this.nextTileNameDiv.textContent = '';
+      if (this.nextTileNameDiv) this.nextTileNameDiv.textContent = '';
     }
   }
 

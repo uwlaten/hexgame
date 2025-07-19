@@ -162,6 +162,11 @@ export default {
    * Holds all tunable parameters for the player.
    */
   PlayerConfig: {
+    /**
+     * The number of tiles the player can choose from in their hand.
+     */
+    handSize: 2,
+
     initialHand: ['CityCentre'],
 
     /**

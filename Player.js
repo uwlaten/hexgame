@@ -19,26 +19,42 @@ export default class Player {
      * @type {number}
      */
     this.score = 0;
-
+    /**
+     * Tracks if the initial City Centre has been placed.
+     * @type {boolean}
+     */
     this.cityCentrePlaced = false;
-    this.hand = Config.PlayerConfig.initialHand[0]; // Start with the City Centre.
-
-    // The deck is now generated via the reset() method, which has access to the map.
+    /**
+     * The player's hand of selectable tiles.
+     * @type {string[]}
+     */
+    this.hand = [];
+    /**
+     * The player's draw pile.
+     * @type {string[]}
+     */
     this.deck = [];
-    this.currentTileInHand = this.hand;
+    /**
+     * The index of the currently selected tile in the hand.
+     * @type {number}
+     */
+    this.activeTileIndex = 0;
 
-    // Announce the initial score so the UI can display it.
-    this.eventEmitter.emit('SCORE_UPDATED', this.score);
-    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
+    // The reset method will handle the initial setup.
+    // Pass null for map initially; it will be set on game start/reset.
+    this.reset(null);
   }
   
   /**
    * Generates the player's main deck, scaling the number of tiles based on map size.
-   * @param {import('./Map.js').default} map The game map, used to determine scaling.
+   * @param {import('./Map.js').default | null} map The game map, used to determine scaling.
    * @returns {string[]} A shuffled array of building IDs for the deck.
    * @private
    */
   _generateDeck(map) {
+    // If no map is provided (e.g., on initial constructor call), return an empty deck.
+    if (!map) return [];
+
     const deck = [];
     const { deckScaling, mainDeck } = Config.PlayerConfig;
 
@@ -70,15 +86,15 @@ export default class Player {
 
   /**
    * Resets the player's state to the beginning of a new game.
-   * @param {import('./Map.js').default} map The game map, required to generate a scaled deck.
+   * @param {import('./Map.js').default | null} map The game map, required to generate a scaled deck. Can be null on initial setup.
    */
   reset(map) {
-    // Mirror the initial state from the constructor.
     this.score = 0;
     this.cityCentrePlaced = false;
-    this.hand = Config.PlayerConfig.initialHand[0];
+    // Start with the City Centre as the only tile in hand.
+    this.hand = [...Config.PlayerConfig.initialHand];
     this.deck = this._generateDeck(map); // Regenerate the deck using the map for scaling.
-    this.currentTileInHand = this.hand;
+    this.activeTileIndex = 0;
 
     // Announce the reset state to the UI.
     this.eventEmitter.emit('SCORE_UPDATED', this.score);
@@ -105,22 +121,64 @@ export default class Player {
   }
 
   /**
-   * Draws a new building type from the player's deck to their hand.
-   * Emits a PLAYER_TILE_HAND_UPDATED event.
+   * Gets the ID of the currently selected tile from the hand.
+   * @returns {string|null}
    */
-  drawNewTile() {
-    if (!this.cityCentrePlaced) {
-      // City Centre not placed yet, no drawing from the main deck.
-      this.currentTileInHand = this.hand;
-    } else if (this.deck.length > 0) {
-      // Main deck exists and has tiles: draw one.
-      this.currentTileInHand = this.deck.pop(); // Draw from the end (more efficient).
-    } else {
-      // Main deck is empty.
-      this.currentTileInHand = null;
-      // Announce that the game is over because the player has no more tiles.
+  getActiveTile() {
+    return this.hand[this.activeTileIndex] || null;
+  }
+
+  /**
+   * Switches the active tile in the hand to the next available choice.
+   */
+  swapActiveTile() {
+    if (this.hand.length > 1) {
+      this.activeTileIndex = (this.activeTileIndex + 1) % this.hand.length;
+      // Announce the change so the UI can update previews
+      this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
+    }
+  }
+
+  /**
+   * Fills the player's hand from the deck after the City Centre is placed.
+   */
+  drawInitialHand() {
+    this.hand = []; // Clear the City Centre
+    const handSize = Config.PlayerConfig.handSize || 2;
+    for (let i = 0; i < handSize; i++) {
+      if (this.deck.length > 0) {
+        this.hand.push(this.deck.pop());
+      }
+    }
+    this.activeTileIndex = 0;
+    this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
+  }
+
+  /**
+   * Removes the placed tile from the hand and draws a replacement from the deck.
+   * @param {number} placedTileIndex The index in the hand of the tile that was placed.
+   */
+  placeTileAndReplenish(placedTileIndex) {
+    if (placedTileIndex < 0 || placedTileIndex >= this.hand.length) {
+      console.error(`Invalid index for placed tile: ${placedTileIndex}`);
+      return;
+    }
+
+    // Remove the placed tile
+    this.hand.splice(placedTileIndex, 1);
+
+    // Draw a replacement if the deck has tiles
+    if (this.deck.length > 0) {
+      this.hand.push(this.deck.pop());
+    }
+
+    // Reset active tile index, ensuring it's valid and defaults to the first tile.
+    this.activeTileIndex = 0;
+
+    if (this.hand.length === 0) {
       this.eventEmitter.emit('GAME_OVER');
     }
+
     this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
 }
