@@ -61,6 +61,9 @@ function main() {
   const initialOptions = uiManager.getGenerationOptions();
   const generationLog = MapGenerator.generate(gameMap, initialOptions);
 
+  // Manually reset the player with the initial map to generate the scaled deck.
+  player.reset(gameMap);
+
   // Print the generation log to the console for debugging.
   console.groupCollapsed('Initial Map Generation Log');
   for (const message of generationLog) {
@@ -98,10 +101,8 @@ function main() {
 
   // The ScoringEngine manages all scoring logic.
   const scoringEngine = new ScoringEngine(eventEmitter, player);
-  scoringEngine.init();
   // Register the rules we want to use for this game.
   scoringEngine.init();
-  
 }
 
 // Wait for the HTML document to be fully loaded before running the main function.

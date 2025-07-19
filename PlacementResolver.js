@@ -269,6 +269,23 @@ export default class PlacementResolver {
           if (condition.operator === 'atLeast' && matchCount >= condition.count) success = true;
           if (condition.operator === 'exactly' && matchCount === condition.count) success = true;
           break;
+        case 'hasConnectorNeighbor': {
+          const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y)).filter(Boolean);
+          const connectorMatchCount = neighbors.filter(n => {
+            // A tile is a valid connection point if its biome is buildable...
+            if (n.biome.isBuildable) return true;
+            // ...or if it contains a building flagged as a connector.
+            if (n.contentType instanceof Building) {
+              const buildingDef = BuildingDefinitionMap.get(n.contentType.type);
+              if (buildingDef?.isConnector) return true;
+            }
+            return false;
+          }).length;
+
+          if (condition.operator === 'atLeast' && connectorMatchCount >= condition.count) success = true;
+          if (condition.operator === 'exactly' && connectorMatchCount === condition.count) success = true;
+          break;
+        }
       }
 
       // NEW: Handle inverted conditions.

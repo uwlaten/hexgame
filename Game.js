@@ -49,7 +49,6 @@ export default class Game {
    * Resets the game to a new state.
    */
   reset() {
-    this.player.reset();
     this.renderer.clearOutlines();
     const options = this.uiManager.getGenerationOptions();
     const generationLog = MapGenerator.generate(this.map, options);
@@ -65,6 +64,9 @@ export default class Game {
     const dimensions = this.renderer.getRequiredCanvasDimensions(this.map);
     this.renderer.canvas.width = dimensions.width;
     this.renderer.canvas.height = dimensions.height;
+
+    // Reset the player *after* the map is generated so the deck can be scaled correctly.
+    this.player.reset(this.map);
 
     this.eventEmitter.emit('MAP_STATE_CHANGED');
   }
@@ -186,12 +188,24 @@ export default class Game {
     const bundleKey = resourceDef.rewardBundle || 'default';
     const bundle = Config.RewardConfig.bundles[bundleKey];
 
-    if (bundle && bundle.count > 0) {
-      notificationMessages.push(bundle.message);
-      for (let i = 0; i < bundle.count; i++) {
-        const tileId = this._getWeightedRandomTile(bundle.pool);
-        if (tileId) {
-          tilesToAward.push(tileId);
+    if (bundle) {
+      // Calculate the scaled number of tiles to award from the bundle.
+      const { baseMapArea } = Config.RewardConfig;
+      const actualMapArea = this.map.width * this.map.height;
+      const scalingFactor = actualMapArea / baseMapArea;
+
+      const { baseCount, min, max } = bundle.count;
+      const scaledCount = Math.round(baseCount * scalingFactor);
+      const finalCount = Math.max(min, Math.min(scaledCount, max));
+
+      if (finalCount > 0) {
+        // Format the message with the calculated count.
+        const message = bundle.message.replace('{count}', finalCount);
+        notificationMessages.push(message);
+
+        for (let i = 0; i < finalCount; i++) {
+          const tileId = this._getWeightedRandomTile(bundle.pool);
+          if (tileId) tilesToAward.push(tileId);
         }
       }
     }

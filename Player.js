@@ -23,10 +23,8 @@ export default class Player {
     this.cityCentrePlaced = false;
     this.hand = Config.PlayerConfig.initialHand[0]; // Start with the City Centre.
 
-    this.deck = this._generateDeck(); // The main deck is now generated and shuffled immediately.
-    this.deckSize = Config.PlayerConfig.initialDeckSize;
-
-    // The type of tile the player currently has selected to place on the map.
+    // The deck is now generated via the reset() method, which has access to the map.
+    this.deck = [];
     this.currentTileInHand = this.hand;
 
     // Announce the initial score so the UI can display it.
@@ -34,10 +32,28 @@ export default class Player {
     this.eventEmitter.emit('PLAYER_TILE_HAND_UPDATED');
   }
   
-  _generateDeck() {
+  /**
+   * Generates the player's main deck, scaling the number of tiles based on map size.
+   * @param {import('./Map.js').default} map The game map, used to determine scaling.
+   * @returns {string[]} A shuffled array of building IDs for the deck.
+   * @private
+   */
+  _generateDeck(map) {
     const deck = [];
-    for (const [buildingId, count] of Object.entries(Config.PlayerConfig.mainDeck)) {
-      for (let i = 0; i < count; i++) {
+    const { deckScaling, mainDeck } = Config.PlayerConfig;
+
+    // Calculate the scaling factor based on map area.
+    const actualMapArea = map.width * map.height;
+    const scalingFactor = actualMapArea / deckScaling.baseMapArea;
+
+    for (const [buildingId, scalingConfig] of Object.entries(mainDeck)) {
+      const { baseCount, min, max } = scalingConfig;
+
+      // Calculate the raw scaled count and then clamp it between min and max.
+      const scaledCount = Math.round(baseCount * scalingFactor);
+      const finalCount = Math.max(min, Math.min(scaledCount, max));
+
+      for (let i = 0; i < finalCount; i++) {
         deck.push(buildingId);
       }
     }
@@ -54,13 +70,14 @@ export default class Player {
 
   /**
    * Resets the player's state to the beginning of a new game.
+   * @param {import('./Map.js').default} map The game map, required to generate a scaled deck.
    */
-  reset() {
+  reset(map) {
     // Mirror the initial state from the constructor.
     this.score = 0;
     this.cityCentrePlaced = false;
     this.hand = Config.PlayerConfig.initialHand[0];
-    this.deck = this._generateDeck(); // Also regenerate the deck on reset.
+    this.deck = this._generateDeck(map); // Regenerate the deck using the map for scaling.
     this.currentTileInHand = this.hand;
 
     // Announce the reset state to the UI.

@@ -52,12 +52,7 @@ export default class ScoringEngine {
    */
   addRule(rule) { this.rules.push(rule); }
 
-  /**
-   * Initializes the engine by subscribing to relevant game events.
-   */
-  init() {
-    this.eventEmitter.on('BUILDING_PLACED', this._handleBuildingPlaced.bind(this));
-  }
+
 
   /**
    * Calculates the potential score for placing a building on a given tile.

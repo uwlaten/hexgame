@@ -78,7 +78,6 @@ export const BuildingLibrary = {
         conditions: [
           { type: 'adjacentToResource', id: 'Grain', claimed: false },
           { type: 'onBiome', id: 'plains' },
-          { type: 'adjacentToRiver' },
           { type: 'feature', id: 'forest', invert: true }, 
           { type: 'feature', id: 'hills', invert: true }, 
         ],
@@ -231,16 +230,26 @@ export const BuildingLibrary = {
   ROAD: {
     id: 'Road',
     name: 'Road',
-    buildableBiomeExceptions: ['ocean', 'lake'],
+    isConnector: true,
+    buildableBiomeExceptions: ['ocean', 'lake', 'mountain'],
     transformations: [
       {
         id: 'Bridge',
         name: 'Bridge',
         conditions: [
           { type: 'onBiome', id: ['ocean', 'lake'] },
-          { type: 'neighbor', property: 'biome.isBuildable', value: true, operator: 'atLeast', count: 2 },
+          { type: 'hasConnectorNeighbor', operator: 'atLeast', count: 1 },
         ],
         reason: 'Built across water',
+      },
+      {
+        id: 'Tunnel',
+        name: 'Tunnel',
+        conditions: [
+          { type: 'onBiome', id: 'mountain' },
+          { type: 'hasConnectorNeighbor', operator: 'atLeast', count: 1 },
+        ],
+        reason: 'Built through mountain',
       },
     ],
     draw: {
@@ -647,6 +656,7 @@ export const BuildingLibrary = {
     id: 'Bridge',
     name: 'Bridge',
     baseId: 'Road',
+    isConnector: true,
     draw: {
       type: 'shapes',
       useSizeFactor: true,
@@ -654,6 +664,22 @@ export const BuildingLibrary = {
         { type: 'rect', fillStyle: '#D2B48C', params: [-0.5, -0.1, 1, 0.2] },
         { type: 'rect', fillStyle: '#8B4513', params: [-0.5, -0.15, 0.1, 0.3] },
         { type: 'rect', fillStyle: '#8B4513', params: [0.4, -0.15, 0.1, 0.3] },
+      ],
+    },
+  },
+  TUNNEL: {
+    id: 'Tunnel',
+    name: 'Tunnel',
+    baseId: 'Road',
+    isConnector: true,
+    draw: {
+      type: 'shapes',
+      useSizeFactor: true,
+      shapes: [
+        // Dark arch for the tunnel entrance
+        { type: 'arc', fillStyle: '#404040', params: [0, 0.2, 0.4, Math.PI, 2 * Math.PI] },
+        // Lighter road surface inside
+        { type: 'rect', fillStyle: '#696969', params: [-0.4, 0.2, 0.8, 0.2] },
       ],
     },
   },

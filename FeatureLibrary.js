@@ -38,7 +38,13 @@ export const FeatureLibrary = {
     name: 'Forest',
     elevationModifier: 0, // Forests don't change the ground elevation
     possibleResources: [
-      { resourceId: 'Wood', chance: 0.2 }, // Forests have a 20% chance to have a Wood resource.
+      {
+        resourceId: 'Wood',
+        chance: 0.2,
+        // This resource can only spawn if the tile is adjacent to at least one other forest tile.
+        // This ensures a Woodcutter/Lumbermill can be placed on the adjacent forest to claim it.
+        conditions: [{ type: 'neighbor', property: 'feature.id', value: 'forest', operator: 'atLeast', count: 1 }],
+      },
     ],
     // Override the default resources for specific biomes.
     resourceOverrides: {

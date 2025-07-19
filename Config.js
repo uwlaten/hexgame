@@ -162,17 +162,24 @@ export default {
    * Holds all tunable parameters for the player.
    */
   PlayerConfig: {
-    // The building IDs that the player starts with in their deck.
     initialHand: ['CityCentre'],
-    mainDeck: {
-      Industry: 11,
-      Residence: 11,
-      Road: 2,
-    },
-    initialDeckSize: 15,
 
-    // initialDeck: ['CityCentre'],
-    // mainDeck: ['Industry', 'Residence', 'Road'],
+    /**
+     * Configuration for scaling the player's starting deck with map size.
+     */
+    deckScaling: {
+      // The map area (width * height) that the base counts are balanced for.
+      baseMapArea: 400, // 20x20 map
+    },
+
+    // The composition of the main deck for the base map area.
+    // Each count will be scaled based on the actual map size.
+    mainDeck: {
+      // baseCount is for the baseMapArea, min/max are hard caps.
+      Industry: { baseCount: 9, min: 5, max: 30 },
+      Residence: { baseCount: 10, min: 5, max: 30 },
+      Road: { baseCount: 1, min: 1, max: 10 },
+    },
   },
 
   /**
@@ -182,7 +189,7 @@ export default {
     generationSliderRanges: {
       temperature: { min: 0, max: 2, step: 1, value: 1 },
       waterLevel: { min: 20, max: 70, step: 1, value: 40 },
-      mapSize: { min: 10, max: 30, step: 1, value: 20 },
+      mapSize: { min: 10, max: 30, step: 1, value: 15 },
     },
     nextTileDisplay: {
       width: 60,
@@ -212,13 +219,18 @@ export default {
      * from claiming resources. Set to false to only receive bundle rewards.
      */
     enableUniqueTileRewards: false,
+    /**
+     * The map area (width * height) that the base counts are balanced for.
+     */
+    baseMapArea: 400, // 20x20 map
 
     // This is the master list of all reward bundles.
     bundles: {
       // The default bundle, used if a resource doesn't specify one.
       default: {
-        message: "+5 Tiles", // Message part for this bundle
-        count: 5,            // Number of random tiles to award
+        // The {count} placeholder will be replaced with the calculated number.
+        message: "+{count} Tiles",
+        count: { baseCount: 5, min: 2, max: 8 },
         pool: [              // Weighted pool for random selection
           { id: 'Industry', weight: 5 },
           { id: 'Residence', weight: 5 },
@@ -227,8 +239,8 @@ export default {
       },
       // A specific bundle for industrial resources.
       IndustryBundle: {
-        message: "+5 Tiles",
-        count: 5,
+        message: "+{count} Tiles",
+        count: { baseCount: 5, min: 2, max: 8 },
         pool: [
           { id: 'Industry', weight: 10 },
           { id: 'Residence', weight: 5 },
@@ -237,8 +249,8 @@ export default {
       },
       // A specific bundle for residential/food resources.
       ResidentialBundle: {
-        message: "+5 Tiles",
-        count: 5,
+        message: "+{count} Tiles",
+        count: { baseCount: 5, min: 2, max: 8 },
         pool: [
           { id: 'Industry', weight: 5 },
           { id: 'Residence', weight: 10 },
