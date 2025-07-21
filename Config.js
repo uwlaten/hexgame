@@ -209,6 +209,15 @@ export default {
       // Color for a placement with a score greater than 2.
       positive_good: 'rgba(0, 100, 0, 0.5)',
     },
+    // Defines when to draw the dashed red outline for placement previews. This is an
+    // array of conditions. The outline will be drawn if ANY condition is met.
+    // Possible conditions:
+    // - 'resourceClaimsOnly': For multi-tile placements (e.g., Industry claiming a resource).
+    // - 'anyValidPlacement': For any valid placement, including single tiles.
+    // - 'onNegativeScore': For placements with a negative score.
+    // - 'onPositiveScore': For placements with a positive score.
+    previewOutlineMode: ['resourceClaimsOnly'],
+
     // Duration in milliseconds for toast notifications to stay on screen.
     notificationDuration: 5000,
     // Duration in milliseconds for the notification fade-in/out transition. Must match CSS.

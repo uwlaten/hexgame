@@ -9,6 +9,7 @@ import { Building } from './Building.js';
 import { Resource } from './Resource.js';
 import { ResourceLibrary } from './ResourceLibrary.js';
 import PlacementResolver from './PlacementResolver.js';
+import HexGridUtils from './HexGridUtils.js';
 import { renderContext } from './main.js';
 import { drawEndIndicator } from './ui/drawing.js';
 
@@ -564,18 +565,64 @@ export default class UIManager {
       DrawingUtils.drawDetails(ctx, buildingDef, tileX + offsetX, tileY + offsetY, hexSize);
     }
 
-    // --- 4. Draw Resource Claim Outline ---
-    if (placementInfo.claimedResourceTile) {
+    // --- 4. Draw Placement Outline (based on config) ---
+    let shouldDrawOutline = false;
+    // The config is now an array of conditions. Draw if any are met.
+    for (const condition of Config.UIConfig.previewOutlineMode) {
+      switch (condition) {
+        case 'anyValidPlacement':
+          shouldDrawOutline = true;
+          break;
+        case 'resourceClaimsOnly':
+          if (placementInfo.claimedResourceTile) {
+            shouldDrawOutline = true;
+          }
+          break;
+        case 'onNegativeScore':
+          if (placementInfo.score.total < 0) {
+            shouldDrawOutline = true;
+          }
+          break;
+        case 'onPositiveScore':
+          if (placementInfo.score.total > 0) {
+            shouldDrawOutline = true;
+          }
+          break;
+      }
+      if (shouldDrawOutline) break; // If one condition is met, no need to check others.
+    }
+
+    if (shouldDrawOutline) {
+      const tilesToOutline = [tile];
+      if (placementInfo.claimedResourceTile) {
+        tilesToOutline.push(placementInfo.claimedResourceTile);
+      }
+
       const { ctx } = renderContext.overlay;
       const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
 
       ctx.save();
       ctx.translate(offsetX, offsetY); // Apply the same offset as the main renderer.
 
-      const tilesToOutline = [tile, placementInfo.claimedResourceTile];
-      // Call the refactored method, passing the overlay context.
-      this.renderer.tileOutline(tilesToOutline, Config.tileOutlineStyle, ctx);
+      const perimeterVertexIds = HexGridUtils.getOuterPerimeter(tilesToOutline, this.map);
+      const perimeterPixels = perimeterVertexIds.map(vId => this.renderer._getVertexPixelCoords(vId, this.map)).filter(Boolean);
 
+      if (perimeterPixels.length > 1) {
+        const style = Config.tileOutlineStyle;
+        ctx.strokeStyle = style.strokeStyle;
+        ctx.lineWidth = style.lineWidth;
+        ctx.setLineDash(Config.tileOutlineDash);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.moveTo(perimeterPixels[0].x, perimeterPixels[0].y);
+        for (let i = 1; i < perimeterPixels.length; i++) {
+          ctx.lineTo(perimeterPixels[i].x, perimeterPixels[i].y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
       ctx.restore(); // Remove the translation.
     }
   }
