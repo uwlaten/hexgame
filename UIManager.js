@@ -594,19 +594,8 @@ export default class UIManager {
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 2;
 
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      // Angle for pointy-top hex. -90 degrees or -PI/2 radians to start at the top.
-      const angle = (Math.PI / 3) * i - Math.PI / 2;
-      const vx = cx + size * Math.cos(angle);
-      const vy = cy + size * Math.sin(angle);
-      if (i === 0) {
-        ctx.moveTo(vx, vy);
-      } else {
-        ctx.lineTo(vx, vy);
-      }
-    }
-    ctx.closePath();
+    // Use the centralized utility to create the path, then apply local styles.
+    DrawingUtils.drawHexPath(ctx, cx, cy, size);
     ctx.fill();
     ctx.stroke();
   }

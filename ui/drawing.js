@@ -1,3 +1,5 @@
+import DrawingUtils from '../DrawingUtils.js';
+
 /**
  * Draws the "END" indicator on a given canvas.
  * This is used for the "Next Tile" preview when the deck is empty.
@@ -13,20 +15,8 @@ export function drawEndIndicator(canvas) {
     // Clear any previous content
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw the hexagon shape (pointy-top)
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-        // Start at the top point
-        const angle = 2 * Math.PI / 6 * (i - 0.5);
-        const x = centerX + hexSize * Math.cos(angle);
-        const y = centerY + hexSize * Math.sin(angle);
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    }
-    ctx.closePath();
+    // Use the canonical utility to draw a pointy-top hexagon path.
+    DrawingUtils.drawHexPath(ctx, centerX, centerY, hexSize);
 
     // Fill and stroke the hexagon
     ctx.fillStyle = '#888888'; // A neutral grey

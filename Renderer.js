@@ -96,21 +96,7 @@ export default class Renderer {
 
     const color = tile.biome.color || '#cccccc'; // Use the color from the biome object.
 
-    this.ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      // The angle for the first vertex is -90 degrees for a pointy-top hexagon,
-      // which now matches our coordinate system.
-      const angle_deg = 60 * i - 90;
-      const angle_rad = (Math.PI / 180) * angle_deg;
-      const vx = cx + this.hexSize * Math.cos(angle_rad);
-      const vy = cy + this.hexSize * Math.sin(angle_rad);
-      if (i === 0) {
-        this.ctx.moveTo(vx, vy);
-      } else {
-        this.ctx.lineTo(vx, vy);
-      }
-    }
-    this.ctx.closePath();
+    DrawingUtils.drawHexPath(this.ctx, cx, cy, this.hexSize);
 
     this.ctx.fillStyle = color;
     this.ctx.fill();
