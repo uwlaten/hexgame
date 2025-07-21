@@ -1,7 +1,7 @@
 /**
  * @fileoverview Defines the main Game class, which orchestrates game logic.
  */
-
+import { renderContext } from './main.js';
 import { Building } from './Building.js';
 import PlacementResolver from './PlacementResolver.js';
 import HexGridUtils from './HexGridUtils.js';
@@ -63,8 +63,10 @@ export default class Game {
 
     // Resize the canvas to fit the new map dimensions.
     const dimensions = this.renderer.getRequiredCanvasDimensions(this.map);
-    this.renderer.canvas.width = dimensions.width;
-    this.renderer.canvas.height = dimensions.height;
+    renderContext.main.canvas.width = dimensions.width;
+    renderContext.main.canvas.height = dimensions.height;
+    renderContext.overlay.canvas.width = dimensions.width;
+    renderContext.overlay.canvas.height = dimensions.height;
 
     // Reset the player *after* the map is generated so the deck can be scaled correctly.
     this.player.reset(this.map);

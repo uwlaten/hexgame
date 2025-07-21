@@ -86,6 +86,7 @@ export default class InputHandler {
    * @private
    */
   _handleMouseMove(event) {
+    
     let tile = null;
 
     if (event) {
