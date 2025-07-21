@@ -50,7 +50,6 @@ export default class Game {
    * Resets the game to a new state.
    */
   reset() {
-    this.renderer.clearOutlines();
     const options = this.uiManager.getGenerationOptions();
     const generationLog = MapGenerator.generate(this.map, options);
 
@@ -198,8 +197,8 @@ export default class Game {
         building.claimedResourceTile = neighborTile;
         neighborTile.contentType.claimedBy = building;
 
-        // Add the pair of tiles (Industry and Resource) to the renderer's outline list.
-        this.renderer.addOutlinedGroup([tile, neighborTile]);
+        // Add the link to the map's data set. The renderer will use this to draw the outline.
+        this.map.claimedLinks.add({ buildingTile: tile, resourceTile: neighborTile });
 
         console.log(`Resource '${resourceToClaim}' at (${neighborTile.x}, ${neighborTile.y}) was claimed by '${building.type}'.`);
 

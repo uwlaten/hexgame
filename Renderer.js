@@ -52,12 +52,6 @@ export default class Renderer {
      * @private
      */
     this._padding = Config.RendererConfig.padding;
-
-    /**
-     * Stores groups of tiles that need a persistent outline. Each group is an array of HexTile objects.
-     * @type {HexTile[][]}
-     */
-    this.outlinedTileGroups = [];
   }
 
   /**
@@ -69,21 +63,6 @@ export default class Renderer {
     this.eventEmitter.on('MAP_STATE_CHANGED', () => {
       this.drawMap(this.map);
     });
-  }
-
-  /**
-   * Adds a group of tiles to be outlined on subsequent draws.
-   * @param {HexTile[]} tiles An array of tiles that form a single outlined group.
-   */
-  addOutlinedGroup(tiles) {
-    this.outlinedTileGroups.push(tiles);
-  }
-
-  /**
-   * Clears all persistent outlines. Called when starting a new game.
-   */
-  clearOutlines() {
-    this.outlinedTileGroups = [];
   }
 
   /**
@@ -323,22 +302,71 @@ export default class Renderer {
    * @private
    */
   _getVertexPixelCoords(vertexId, map) {
-    const tileCoords = HexGridUtils.getTilesForVertex(vertexId);
-    if (tileCoords.length !== 3) return null;
+    const definingTileCoords = HexGridUtils.getTilesForVertex(vertexId);
 
-    let totalX = 0;
-    let totalY = 0;
+    // 1. Find an "anchor" tile that is guaranteed to be on the map.
+    // This is the key to correctly calculating vertices on the map's edge.
+    const anchorTile = definingTileCoords
+      .map(coord => map.getTileAt(coord.x, coord.y))
+      .find(tile => tile !== null);
 
-    for (const coord of tileCoords) {
-      const tile = map.getTileAt(coord.x, coord.y);
-      if (!tile) return null; // Vertex is partially off-map
-
-      const { x: px, y: py } = this.tileToPixel(tile);
-      totalX += px;
-      totalY += py;
+    // If no tile for this vertex is on the map, we can't calculate its position.
+    if (!anchorTile) {
+      return null;
     }
 
-    return { x: totalX / 3, y: totalY / 3 };
+    // 2. Determine which corner of the anchor tile this vertex represents.
+    // A vertex is defined by an anchor tile and two of its neighbors.
+    // We find the indices of the other two defining tiles in the anchor's neighbor list.
+    const anchorCoordStr = `${anchorTile.x},${anchorTile.y}`;
+    const otherCoords = definingTileCoords.filter(c => `${c.x},${c.y}` !== anchorCoordStr);
+
+    const neighborCoords = HexGridUtils.getNeighbors(anchorTile.x, anchorTile.y);
+    const neighborIndices = [];
+
+    for (const other of otherCoords) {
+      const index = neighborCoords.findIndex(n => n.x === other.x && n.y === other.y);
+      if (index !== -1) {
+        neighborIndices.push(index);
+      }
+    }
+
+    // A vertex must be defined by two adjacent neighbors. If not, the vertexId is malformed.
+    if (neighborIndices.length !== 2) {
+      console.warn(`Could not determine corner for vertex ${vertexId} on tile (${anchorTile.x}, ${anchorTile.y}). The defining tiles may not be contiguous. Found ${neighborIndices.length} neighbors instead of 2.`);
+      return null;
+    }
+
+    // Sort for consistent matching, e.g., [0, 5] is the same as [5, 0].
+    neighborIndices.sort((a, b) => a - b);
+    const key = `${neighborIndices[0]},${neighborIndices[1]}`;
+
+    let cornerIndex = -1;
+    // This mapping is based on the neighbor order in HexGridUtils (E,SE,SW,W,NW,NE) and
+    // the corner drawing order in Renderer.drawHexTile (pointy-top).
+    // The cornerIndex must match the loop index 'i' in drawHexTile to get the correct angle.
+    // Corners (i): 0:Top, 1:T-R, 2:B-R, 3:Bottom, 4:B-L, 5:T-L
+    switch (key) {
+      case '4,5': cornerIndex = 0; break; // NW(4), NE(5) -> Top corner
+      case '0,5': cornerIndex = 1; break; // E(0), NE(5)  -> Top-Right corner
+      case '0,1': cornerIndex = 2; break; // E(0), SE(1)  -> Bottom-Right corner
+      case '1,2': cornerIndex = 3; break; // SE(1), SW(2) -> Bottom corner
+      case '2,3': cornerIndex = 4; break; // SW(2), W(3)  -> Bottom-Left corner
+      case '3,4': cornerIndex = 5; break; // W(3), NW(4)  -> Top-Left corner
+      default:
+        console.error(`Invalid neighbor pair [${key}] for vertex calculation on vertex ${vertexId}.`);
+        return null;
+    }
+
+    // 3. Calculate the corner's exact pixel coordinates using trigonometry.
+    const { x: cx, y: cy } = this.tileToPixel(anchorTile);
+    // The angle calculation MUST match the one used in drawHexTile for consistency.
+    const angle_deg = 60 * cornerIndex - 90;
+    const angle_rad = (Math.PI / 180) * angle_deg;
+    const vx = cx + this.hexSize * Math.cos(angle_rad);
+    const vy = cy + this.hexSize * Math.sin(angle_rad);
+
+    return { x: vx, y: vy };
   }
 
   /**
@@ -378,11 +406,14 @@ export default class Renderer {
   _drawClaimOutlines(map) {
     if (map.claimedLinks.size === 0) return;
 
-    this.ctx.strokeStyle = 'red';
-    this.ctx.lineWidth = 2;
+    this.ctx.save();
+    const style = Config.tileOutlineStyle;
+    this.ctx.strokeStyle = style.strokeStyle;
+    this.ctx.lineWidth = style.lineWidth;
+    this.ctx.setLineDash(Config.tileOutlineDash);
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
-
+    
     const offset = 2; // How many pixels to draw the line inside the perimeter.
 
     for (const link of map.claimedLinks) {
@@ -424,9 +455,11 @@ export default class Renderer {
 
         i === 0 ? this.ctx.moveTo(offsetX, offsetY) : this.ctx.lineTo(offsetX, offsetY);
       }
+      this.ctx.closePath(); // Connect the last point back to the first.
       
       this.ctx.stroke();
     }
+    this.ctx.restore();
   }
 
   /**
@@ -458,13 +491,6 @@ export default class Renderer {
 
     // Draw rivers on top of tiles and outlines.
     this._drawRivers(map);
-
-    // Draw persistent outlines for claimed resources, etc.
-    if (this.outlinedTileGroups.length > 0) {
-      for (const group of this.outlinedTileGroups) {
-        this.tileOutline(group, Config.tileOutlineStyle);
-      }
-    }
 
     // Restore the context to its original state
     this.ctx.restore();

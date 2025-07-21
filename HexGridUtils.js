@@ -61,14 +61,14 @@ export default class HexGridUtils {
 
   /**
    * Creates a unique, sorted string ID for a vertex from three tiles.
-   * @param {import('./HexTile.js').default} tile1 The first tile.
-   * @param {import('./HexTile.js').default} tile2 The second tile.
-   * @param {import('./HexTile.js').default} tile3 The third tile.
+   * @param {{x: number, y: number}} coord1 The first coordinate.
+   * @param {{x: number, y: number}} coord2 The second coordinate.
+   * @param {{x: number, y: number}} coord3 The third coordinate.
    * @returns {string|null} The unique vertex ID, or null if any tile is invalid.
    */
-  static getVertexIdFromTiles(tile1, tile2, tile3) {
-    if (!tile1 || !tile2 || !tile3) return null;
-    const coords = [`${tile1.x},${tile1.y}`, `${tile2.x},${tile2.y}`, `${tile3.x},${tile3.y}`];
+  static getVertexIdFromCoords(coord1, coord2, coord3) {
+    if (!coord1 || !coord2 || !coord3) return null;
+    const coords = [`${coord1.x},${coord1.y}`, `${coord2.x},${coord2.y}`, `${coord3.x},${coord3.y}`];
     coords.sort();
     return coords.join(';');
   }
@@ -133,12 +133,13 @@ export default class HexGridUtils {
    */
   static getVerticesForTile(tile, map) {
     const vertices = new Set();
-    const neighbors = this.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y));
+    const tileCoord = { x: tile.x, y: tile.y };
+    const neighborCoords = this.getNeighbors(tile.x, tile.y);
 
     for (let i = 0; i < 6; i++) {
-      const neighbor1 = neighbors[i];
-      const neighbor2 = neighbors[(i + 1) % 6];
-      const vertexId = this.getVertexIdFromTiles(tile, neighbor1, neighbor2);
+      const neighbor1Coord = neighborCoords[i];
+      const neighbor2Coord = neighborCoords[(i + 1) % 6];
+      const vertexId = this.getVertexIdFromCoords(tileCoord, neighbor1Coord, neighbor2Coord);
       if (vertexId) vertices.add(vertexId);
     }
 

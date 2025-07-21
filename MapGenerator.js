@@ -1135,14 +1135,15 @@ export default class MapGenerator {
    */
   static _getVerticesForTile(tile, map) {
     const vertices = new Set();
-    const neighbors = HexGridUtils.getNeighbors(tile.x, tile.y).map(c => map.getTileAt(c.x, c.y));
+    const tileCoord = { x: tile.x, y: tile.y };
+    const neighborCoords = HexGridUtils.getNeighbors(tile.x, tile.y);
 
     // A vertex is defined by a tile and two of its adjacent neighbors.
     // We loop through the neighbors to define all 6 vertices.
     for (let i = 0; i < 6; i++) {
-      const neighbor1 = neighbors[i];
-      const neighbor2 = neighbors[(i + 1) % 6];
-      const vertexId = HexGridUtils.getVertexIdFromTiles(tile, neighbor1, neighbor2);
+      const neighbor1Coord = neighborCoords[i];
+      const neighbor2Coord = neighborCoords[(i + 1) % 6];
+      const vertexId = HexGridUtils.getVertexIdFromCoords(tileCoord, neighbor1Coord, neighbor2Coord);
       if (vertexId) {
         vertices.add(vertexId);
       }
@@ -1413,15 +1414,15 @@ export default class MapGenerator {
 
     // Find the vertex "opposite" each of the three defining tiles.
     const t4 = findCommonNeighbor(t2, t3, t1);
-    const v2 = HexGridUtils.getVertexIdFromTiles(t2, t3, t4);
+    const v2 = HexGridUtils.getVertexIdFromCoords(t2, t3, t4);
     if (v2) neighborVertices.add(v2);
 
     const t5 = findCommonNeighbor(t1, t3, t2);
-    const v3 = HexGridUtils.getVertexIdFromTiles(t1, t3, t5);
+    const v3 = HexGridUtils.getVertexIdFromCoords(t1, t3, t5);
     if (v3) neighborVertices.add(v3);
 
     const t6 = findCommonNeighbor(t1, t2, t3);
-    const v4 = HexGridUtils.getVertexIdFromTiles(t1, t2, t6);
+    const v4 = HexGridUtils.getVertexIdFromCoords(t1, t2, t6);
     if (v4) neighborVertices.add(v4);
 
     return Array.from(neighborVertices);
