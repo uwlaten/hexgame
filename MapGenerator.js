@@ -760,7 +760,7 @@ export default class MapGenerator {
       if (isNextToMajorWater) continue;
 
       // Rule: Must not have a river flowing along its edge.
-      const vertices = this._getVerticesForTile(tile, map);
+      const vertices = HexGridUtils.getVerticesForTile(tile, map);
       let hasRiver = false;
       for (let i = 0; i < vertices.length; i++) {
         const edgeId = HexGridUtils.getEdgeId(vertices[i], vertices[(i + 1) % vertices.length]);
@@ -1039,7 +1039,7 @@ export default class MapGenerator {
         const sourceTile = sourceChoice.tile;
         const sourceIndex = potentialSources.indexOf(sourceChoice);
 
-        const vertices = this._getVerticesForTile(sourceTile, map);
+        const vertices = HexGridUtils.getVerticesForTile(sourceTile, map);
         if (vertices.length === 0) {
           if (sourceIndex > -1) potentialSources.splice(sourceIndex, 1);
           continue; // This source is unusable, try again.
@@ -1124,31 +1124,6 @@ export default class MapGenerator {
       totalElevation += this._getTileEffectiveElevation(tile);
     }
     return totalElevation / tileCoords.length;
-  }
-
-  /**
-   * Gets the 6 vertices that form the corners of a given tile.
-   * @param {import('./HexTile.js').default} tile The tile to get vertices for.
-   * @param {import('./Map.js').default} map The map object.
-   * @returns {string[]} An array of 6 unique vertex IDs.
-   * @private
-   */
-  static _getVerticesForTile(tile, map) {
-    const vertices = new Set();
-    const tileCoord = { x: tile.x, y: tile.y };
-    const neighborCoords = HexGridUtils.getNeighbors(tile.x, tile.y);
-
-    // A vertex is defined by a tile and two of its adjacent neighbors.
-    // We loop through the neighbors to define all 6 vertices.
-    for (let i = 0; i < 6; i++) {
-      const neighbor1Coord = neighborCoords[i];
-      const neighbor2Coord = neighborCoords[(i + 1) % 6];
-      const vertexId = HexGridUtils.getVertexIdFromCoords(tileCoord, neighbor1Coord, neighbor2Coord);
-      if (vertexId) {
-        vertices.add(vertexId);
-      }
-    }
-    return Array.from(vertices);
   }
 
   /**
@@ -1440,7 +1415,7 @@ export default class MapGenerator {
     const entryCenter = HexGridUtils.getVertexCenterCube(entryVertexId, map);
     if (!entryCenter) return null;
 
-    const lakeVertices = this._getVerticesForTile(lakeTile, map);
+    const lakeVertices = HexGridUtils.getVerticesForTile(lakeTile, map);
     let bestExitVertex = null;
     let maxDist = -1;
 
@@ -1499,7 +1474,7 @@ export default class MapGenerator {
     const lakeTiles = map.grid.flat().filter(t => t.biome.id === BiomeLibrary.LAKE.id);
 
     for (const lakeTile of lakeTiles) {
-      const vertices = this._getVerticesForTile(lakeTile, map);
+      const vertices = HexGridUtils.getVerticesForTile(lakeTile, map);
       if (vertices.length < 6) continue; // Should not happen on a valid map
 
       let hasRiverOnEdge = false;
@@ -1792,7 +1767,7 @@ export default class MapGenerator {
           break;
         }
         case 'adjacentToRiver': {
-          const vertices = this._getVerticesForTile(tile, map);
+          const vertices = HexGridUtils.getVerticesForTile(tile, map);
           let hasRiver = false;
           // Loop correctly over the actual number of vertices, which may be less than 6 for edge tiles.
           for (let i = 0; i < vertices.length; i++) {
