@@ -12,6 +12,7 @@ import Game from './Game.js';
 import UIManager from './UIManager.js';
 import InputHandler from './InputHandler.js';
 import ScoringEngine from './ScoringEngine.js';
+import RewardManager from './RewardManager.js';
 import Config from './Config.js';
 
 // This object will hold our canvas and context references for easy access
@@ -103,6 +104,10 @@ function main() {
   const scoringEngine = new ScoringEngine(eventEmitter, player);
   // Register the rules we want to use for this game.
   scoringEngine.init();
+
+  // The RewardManager handles giving tiles to the player for claiming resources.
+  const rewardManager = new RewardManager(eventEmitter, player, gameMap);
+  rewardManager.init();
 }
 
 // Wait for the HTML document to be fully loaded before running the main function.
