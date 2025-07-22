@@ -10,7 +10,6 @@ import { Resource } from './Resource.js';
 import { ResourceLibrary } from './ResourceLibrary.js';
 import PlacementResolver from './PlacementResolver.js';
 import HexGridUtils from './HexGridUtils.js';
-import { renderContext } from './main.js';
 import { drawEndIndicator } from './ui/drawing.js';
 
 /**
@@ -127,7 +126,7 @@ export default class UIManager {
       const newPayload = { ...payload, placementInfo };
 
       this.updateTooltip(newPayload);
-      this.drawPlacementPreview(newPayload);
+      this.eventEmitter.emit('PLACEMENT_PREVIEW_REQUESTED', newPayload);
     });
   }
 
@@ -501,130 +500,6 @@ export default class UIManager {
         if (index > -1) this.activeNotifications.splice(index, 1);
       }, Config.UIConfig.notificationTransitionDuration);
     }, Config.UIConfig.notificationDuration);
-  }
-
-  /**
-   * Clears any temporary drawings from the overlay canvas.
-   */
-  clearPlacementPreview() {
-    const { canvas, ctx } = renderContext.overlay;
-    if (canvas && ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  }
-
-  /**
-   * Draws a preview of a potential building placement on the overlay canvas.
-   * This includes score-based shading, resource claim outlines, and the building icon.
-    * @param {{tile: import('./HexTile.js').default|null, placementInfo: object|null}} payload The event payload.
-   */
-  drawPlacementPreview(payload) {
-    this.clearPlacementPreview();
-
-    const { tile, placementInfo } = payload;
-    // We only draw a preview if the placement is valid.
-    if (!tile || !placementInfo || !placementInfo.isValid) {
-      return;
-    }
-
-    // --- 1. Determine Shading Color ---
-    let shadeColor = null;
-    const score = placementInfo.score.total;
-
-    const shading = Config.UIConfig.previewShading;
-    if (score < 0) {
-      shadeColor = shading.negative;
-    } else if (score === 2) {
-      shadeColor = shading.positive_ok;
-    } else if (score > 2) {
-      shadeColor = shading.positive_good;
-    }
-
-    // --- 2. Draw the Shading (if applicable) ---
-    if (shadeColor) {
-      const { ctx } = renderContext.overlay;
-      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
-      const { x: tileX, y: tileY } = this.renderer.tileToPixel(tile);
-      const hexSize = this.renderer.hexSize;
-
-      ctx.fillStyle = shadeColor;
-      DrawingUtils.drawHexPath(ctx, tileX + offsetX, tileY + offsetY, hexSize);
-      ctx.fill();
-    }
-
-    // --- 3. Draw Building Icon ---
-    // We draw the icon of the building that *would* be placed, including transformations.
-    const buildingDef = BuildingDefinitionMap.get(placementInfo.resolvedBuildingId);
-    if (buildingDef?.draw) {
-      const { ctx } = renderContext.overlay;
-      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
-      const { x: tileX, y: tileY } = this.renderer.tileToPixel(tile);
-      const hexSize = this.renderer.hexSize;
-
-      // DrawingUtils.drawDetails handles its own translation, so we pass the final screen coordinates.
-      DrawingUtils.drawDetails(ctx, buildingDef, tileX + offsetX, tileY + offsetY, hexSize);
-    }
-
-    // --- 4. Draw Placement Outline (based on config) ---
-    let shouldDrawOutline = false;
-    // The config is now an array of conditions. Draw if any are met.
-    for (const condition of Config.UIConfig.previewOutlineMode) {
-      switch (condition) {
-        case 'anyValidPlacement':
-          shouldDrawOutline = true;
-          break;
-        case 'resourceClaimsOnly':
-          if (placementInfo.claimedResourceTile) {
-            shouldDrawOutline = true;
-          }
-          break;
-        case 'onNegativeScore':
-          if (placementInfo.score.total < 0) {
-            shouldDrawOutline = true;
-          }
-          break;
-        case 'onPositiveScore':
-          if (placementInfo.score.total > 0) {
-            shouldDrawOutline = true;
-          }
-          break;
-      }
-      if (shouldDrawOutline) break; // If one condition is met, no need to check others.
-    }
-
-    if (shouldDrawOutline) {
-      const tilesToOutline = [tile];
-      if (placementInfo.claimedResourceTile) {
-        tilesToOutline.push(placementInfo.claimedResourceTile);
-      }
-
-      const { ctx } = renderContext.overlay;
-      const { x: offsetX, y: offsetY } = this.renderer.getTranslationOffset();
-
-      ctx.save();
-      ctx.translate(offsetX, offsetY); // Apply the same offset as the main renderer.
-
-      const perimeterVertexIds = HexGridUtils.getOuterPerimeter(tilesToOutline, this.map);
-      const perimeterPixels = perimeterVertexIds.map(vId => this.renderer._getVertexPixelCoords(vId, this.map)).filter(Boolean);
-
-      if (perimeterPixels.length > 1) {
-        const style = Config.tileOutlineStyle;
-        ctx.strokeStyle = style.strokeStyle;
-        ctx.lineWidth = style.lineWidth;
-        ctx.setLineDash(Config.tileOutlineDash);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        ctx.beginPath();
-        ctx.moveTo(perimeterPixels[0].x, perimeterPixels[0].y);
-        for (let i = 1; i < perimeterPixels.length; i++) {
-          ctx.lineTo(perimeterPixels[i].x, perimeterPixels[i].y);
-        }
-        ctx.closePath();
-        ctx.stroke();
-      }
-      ctx.restore(); // Remove the translation.
-    }
   }
 
   /**

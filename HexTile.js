@@ -68,8 +68,6 @@ export default class HexTile {
    * @param {Building|object|null} content The content to place on the tile.
    */
   setContent(content) {
-    const isResourceDefinition = content && typeof content === 'object' && content.id;
-
     if (content === null || content instanceof Building || content instanceof Resource) {
       this.contentType = content;
     } else {

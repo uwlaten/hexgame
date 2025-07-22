@@ -73,7 +73,7 @@ function main() {
 
   // Create the renderer instance first. It is now the source of truth for
   // all layout and sizing calculations.
-  const renderer = new Renderer(renderContext.main.canvas, Config.RendererConfig.hexSize, eventEmitter, gameMap);
+  const renderer = new Renderer(renderContext.main.canvas, renderContext.overlay.canvas, Config.RendererConfig.hexSize, eventEmitter, gameMap);
   renderer.init();
 
   // Ask the renderer for the required canvas size and apply it.
