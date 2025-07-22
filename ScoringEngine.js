@@ -3,7 +3,6 @@
  * against a set of rules to update the player's score.
  */
 import { AllRules, ScoringRule } from './ScoringRules.js';
-import EventEmitter from './EventEmitter.js';
 
 /**
  * The ScoringEngine is responsible for calculating score changes based on game events.
@@ -19,24 +18,22 @@ export default class ScoringEngine {
   constructor(eventEmitter, player) {
     this.eventEmitter = eventEmitter;
     this.player = player;
-    /**
-     * A list of scoring rule instances to evaluate against.
-     * @type {import('./ScoringRules.js').ScoringRule[]}
-     * @private
-     */
-    this.rules = [];
-    this._registerCoreRules();
-
   }
 
-  _registerCoreRules() {
-
+  /**
+   * Creates and returns an array of all registered scoring rule instances.
+   * @returns {import('./ScoringRules.js').ScoringRule[]}
+   * @private
+   */
+  static _getCoreRules() {
+    const rules = [];
     // Initialize the engine with the registered rules.
      for (const RuleClass of Object.values(AllRules)) {
       if (typeof RuleClass === 'function' && RuleClass !== ScoringRule && RuleClass.prototype instanceof ScoringRule) {
-        this.addRule(new RuleClass());
+        rules.push(new RuleClass());
       }
     }
+    return rules;
   }
 
   /**
@@ -46,13 +43,6 @@ export default class ScoringEngine {
     const total = breakdown.reduce((sum, component) => sum + component.points, 0);
     return { total, breakdown };
   }
-  /**
-   * Registers a new scoring rule with the engine.
-   * @param {import('./ScoringRules.js').ScoringRule} rule An instance of a class that extends ScoringRule.
-   */
-  addRule(rule) { this.rules.push(rule); }
-
-
 
   /**
    * Calculates the potential score for placing a building on a given tile.
@@ -64,21 +54,19 @@ export default class ScoringEngine {
    * @returns {object} The calculated score report for the hypothetical placement.
    */
   static calculateScoreFor(buildingId, tile, map, appliedTransformations = []) {
-    // In this static version, we create a temporary ScoringEngine with the
-    // registered rules, but without a player to update. We then use it to
-    // evaluate the score. Note that a temporary event emitter is still
-    // required, as it's a required parameter for the constructor. However,
-    // no events will ever be emitted on it, as this method is purely
-    // for calculation.
-    const tempEngine = new ScoringEngine(new EventEmitter(), null);
-    const breakdown = tempEngine._calculateScore(buildingId, tile, map, appliedTransformations);
+    const rules = ScoringEngine._getCoreRules();
+    const breakdown = ScoringEngine._calculateScore(buildingId, tile, map, appliedTransformations, rules);
     return ScoringEngine.createScoreReport(breakdown);
   }
 
-  _calculateScore(buildingId, tile, map, appliedTransformations) {
+  /**
+   * The core static logic for calculating a score breakdown.
+   * @private
+   */
+  static _calculateScore(buildingId, tile, map, appliedTransformations, rules) {
     // Use flatMap to iterate over all rules, evaluate them (which returns an array of score components),
     // and flatten the resulting array of arrays into a single array.
-    const allComponents = this.rules.flatMap(rule => rule.evaluate(tile, buildingId, map, appliedTransformations));
+    const allComponents = rules.flatMap(rule => rule.evaluate(tile, buildingId, map, appliedTransformations));
 
     // Filter out any components that have zero points to keep the final report clean.
     return allComponents.filter(component => component.points !== 0);
@@ -92,7 +80,8 @@ export default class ScoringEngine {
    */
   _handleBuildingPlaced(tile, appliedTransformations) {
     const buildingId = tile.contentType.type;
-    const breakdown = this._calculateScore(buildingId, tile, tile.map, appliedTransformations);
+    const rules = ScoringEngine._getCoreRules();
+    const breakdown = ScoringEngine._calculateScore(buildingId, tile, tile.map, appliedTransformations, rules);
 
     const scoreReport = ScoringEngine.createScoreReport(breakdown);
 
