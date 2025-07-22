@@ -113,20 +113,13 @@ export default class UIManager {
     });
 
     this.eventEmitter.on('HEX_HOVERED', payload => {
-      const { tile } = payload;
-      let placementInfo = null;
+      this._updatePreview(payload);
+    });
 
-      // Calculate placement info only if there's a tile, it's empty, and the player has a building.
-      if (tile && !tile.contentType && this.player?.getActiveTile() && this.map) {
-        const baseBuildingId = this.player.getActiveTile();
-        placementInfo = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
-      }
-
-      // Add placementInfo to the payload for the other functions to use.
-      const newPayload = { ...payload, placementInfo };
-
-      this.updateTooltip(newPayload);
-      this.eventEmitter.emit('PLACEMENT_PREVIEW_REQUESTED', newPayload);
+    // Listen for when the context for a preview changes (e.g., player swaps tile)
+    // so we can re-evaluate the preview on the same tile.
+    this.eventEmitter.on('PREVIEW_CONTEXT_CHANGED', payload => {
+      this._updatePreview(payload);
     });
   }
 
@@ -615,5 +608,28 @@ export default class UIManager {
     this.industryTilesCountSpan.textContent = breakdown['Industry'];
     this.residenceTilesCountSpan.textContent = breakdown['Residence'];
     this.roadTilesCountSpan.textContent = breakdown['Road'];
+  }
+
+  /**
+   * Calculates placement info for a given tile and updates the tooltip and placement preview.
+   * This is the central logic for showing what will happen when a player hovers over a tile.
+   * @param {{tile: import('./HexTile.js').default|null, event?: MouseEvent|null}} payload The event payload.
+   * @private
+   */
+  _updatePreview(payload) {
+    const { tile } = payload;
+    let placementInfo = null;
+
+    // Calculate placement info only if there's a tile, it's empty, and the player has a building.
+    if (tile && !tile.contentType && this.player?.getActiveTile() && this.map) {
+      const baseBuildingId = this.player.getActiveTile();
+      placementInfo = PlacementResolver.resolvePlacement(baseBuildingId, tile, this.map, this.player);
+    }
+
+    // Add placementInfo to the payload for the other functions to use.
+    const newPayload = { ...payload, placementInfo };
+
+    this.updateTooltip(newPayload);
+    this.eventEmitter.emit('PLACEMENT_PREVIEW_REQUESTED', newPayload);
   }
 }

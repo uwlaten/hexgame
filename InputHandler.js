@@ -51,8 +51,11 @@ export default class InputHandler {
     if (event.key === 'Tab') {
       event.preventDefault(); // Prevent the browser's default tabbing behavior.
       this.eventEmitter.emit('SWAP_TILE_REQUESTED');
+      // If the user was hovering over a tile, we need to tell the UI to
+      // re-evaluate the preview for that same tile with the new context (the swapped hand).
       if (this.lastHoveredTile != null) {
-        this.eventEmitter.emit('HEX_HOVERED', {tile: this.lastHoveredTile, event: null});
+        // We emit a specific event rather than re-using HEX_HOVERED to be more explicit.
+        this.eventEmitter.emit('PREVIEW_CONTEXT_CHANGED', { tile: this.lastHoveredTile });
       }
     }
   }
